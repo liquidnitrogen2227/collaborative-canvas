@@ -12,6 +12,8 @@ export class WSClient {
     this.socket = io();
   }
 
+  id(): string | undefined { return (this.socket as any).id; }
+
   on(event: 'draw:begin', cb: (p: DrawBegin & { userId: string }) => void): void;
   on(event: 'draw:point', cb: (p: DrawPoint & { userId: string }) => void): void;
   on(event: 'draw:end', cb: (p: DrawEnd & { userId: string }) => void): void;
