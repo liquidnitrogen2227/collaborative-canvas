@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: collaborative-canvas
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node dist/server/server.js
+    healthCheckPath: /healthz
+    autoDeploy: true
