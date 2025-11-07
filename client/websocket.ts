@@ -1,8 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 
-export type DrawBegin = { x: number; y: number; color: string; size: number };
-export type DrawPoint = { x: number; y: number };
-export type DrawEnd = { };
+export type DrawBegin = { strokeId: string; x: number; y: number; color: string; size: number };
+export type DrawPoint = { strokeId: string; x: number; y: number };
+export type DrawEnd = { strokeId: string };
 export type Cursor = { x: number; y: number };
 
 export class WSClient {
