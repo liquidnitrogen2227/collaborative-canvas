@@ -1,0 +1,10 @@
+node_modules/
+dist/
+client/build/
+.env
+.env.*
+.DS_Store
+Thumbs.db
+/.vscode/
+*.log
+coverage/
