@@ -2,25 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Collaborative Canvas</title>
   <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <div id="toolbar">
-      <label>Brush <input id="size" type="range" min="1" max="32" value="4" /></label>
-      <input id="color" type="color" value="#000000" />
-  <button id="tool-brush" data-tool="brush" class="tool active">Brush</button>
-  <button id="tool-eraser" data-tool="eraser" class="tool">Eraser</button>
-  <button id="tool-line" data-tool="line" class="tool">Line</button>
-  <button id="tool-rect" data-tool="rect" class="tool">Rect</button>
-  <button id="tool-ellipse" data-tool="ellipse" class="tool">Ellipse</button>
-      <button id="undo" title="Undo (Ctrl+Z)">Undo</button>
-      <button id="redo" title="Redo (Ctrl+Y)">Redo</button>
-      <span id="users"></span>
-  <button id="clear">Clear (local)</button>
-  <button id="clear-global">Clear (global)</button>
-    </div>
+  <!-- Mobile-friendly toolbar: layout adjusts via CSS media queries -->
+  <div id="toolbar">
+    <button id="toggle-toolbar" aria-label="Toggle toolbar" style="display:none">☰</button>
+    <label class="hide-when-collapsed">Brush <input id="size" type="range" min="1" max="32" value="4" /></label>
+    <input id="color" class="hide-when-collapsed" type="color" value="#000000" />
+    <button id="tool-brush" data-tool="brush" class="tool active hide-when-collapsed">Brush</button>
+    <button id="tool-eraser" data-tool="eraser" class="tool hide-when-collapsed">Eraser</button>
+    <button id="tool-line" data-tool="line" class="tool hide-when-collapsed">Line</button>
+    <button id="tool-rect" data-tool="rect" class="tool hide-when-collapsed">Rect</button>
+    <button id="tool-ellipse" data-tool="ellipse" class="tool hide-when-collapsed">Ellipse</button>
+    <button id="undo" title="Undo (Ctrl+Z)" class="hide-when-collapsed">Undo</button>
+    <button id="redo" title="Redo (Ctrl+Y)" class="hide-when-collapsed">Redo</button>
+    <span id="users" class="hide-when-collapsed"></span>
+    <button id="clear" class="hide-when-collapsed">Clear (local)</button>
+    <button id="clear-global" class="hide-when-collapsed">Clear (global)</button>
+  </div>
     <div id="stage">
       <canvas id="base"></canvas>
       <canvas id="live"></canvas>

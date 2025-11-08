@@ -16,6 +16,8 @@ const eraserBtn = document.getElementById('tool-eraser') as HTMLButtonElement;
 const lineBtn = document.getElementById('tool-line') as HTMLButtonElement;
 const rectBtn = document.getElementById('tool-rect') as HTMLButtonElement;
 const ellipseBtn = document.getElementById('tool-ellipse') as HTMLButtonElement;
+const toggleToolbarBtn = document.getElementById('toggle-toolbar') as HTMLButtonElement | null;
+const toolbar = document.getElementById('toolbar') as HTMLDivElement;
 
 const layers = new CanvasLayers(base, live, hud);
 const ws = new WSClient();
@@ -34,6 +36,19 @@ eraserBtn.addEventListener('click', () => setTool('eraser'));
 lineBtn.addEventListener('click', () => setTool('line'));
 rectBtn.addEventListener('click', () => setTool('rect'));
 ellipseBtn.addEventListener('click', () => setTool('ellipse'));
+
+// Show toggle button on small screens
+function updateToggleVisibility() {
+  if (!toggleToolbarBtn) return;
+  const show = window.innerWidth < 700;
+  toggleToolbarBtn.style.display = show ? 'inline-block' : 'none';
+  if (!show) toolbar.classList.remove('collapsed');
+}
+updateToggleVisibility();
+window.addEventListener('resize', updateToggleVisibility);
+toggleToolbarBtn?.addEventListener('click', () => {
+  toolbar.classList.toggle('collapsed');
+});
 
 let isDown = false;
 let currentStrokeId: string | null = null;
@@ -57,6 +72,8 @@ base.addEventListener('pointerdown', (e) => {
   lastPoint = p;
   localPoints.length = 0; localPoints.push(p);
   ws.emit('stroke:begin', { strokeId: currentStrokeId, tool, color: color(), size: size(), x: p.x, y: p.y });
+  // Ensure we keep receiving events even if finger/mouse leaves canvas slightly
+  try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch {}
 });
 
 window.addEventListener('pointermove', (e) => {
@@ -77,12 +94,11 @@ window.addEventListener('pointermove', (e) => {
   lastPoint = p;
 });
 
-window.addEventListener('pointerup', () => {
+window.addEventListener('pointerup', (e) => {
   if (!isDown) return;
   isDown = false;
   if (currentStrokeId) {
     ws.emit('stroke:end', { strokeId: currentStrokeId });
-    // Optimistic local commit for shapes so eraser can act immediately
     if (tool === 'line' || tool === 'rect' || tool === 'ellipse') {
       const op: StrokeOp = {
         id: currentStrokeId,
@@ -94,7 +110,6 @@ window.addEventListener('pointerup', () => {
         ts: Date.now(),
       };
       layers.applyCommittedOp(op);
-      // skip re-applying when server commit arrives
       incrementalApplied.add(op.id);
       layers.clearAllPreviews?.();
     }
@@ -103,6 +118,20 @@ window.addEventListener('pointerup', () => {
     localPoints.length = 0;
     layers.clearLive();
   }
+  // Release pointer capture if applied
+  try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+});
+
+// Prevent iOS Safari from triggering pull-to-refresh / scroll during drawing
+document.addEventListener('touchmove', (ev) => {
+  if (isDown) ev.preventDefault();
+}, { passive: false });
+
+// Handle orientation changes explicitly (resize event already adjusts, but we can trigger manual flush)
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    layers['replay']?.(history); // re-render after resize
+  }, 50);
 });
 
 undoBtn.addEventListener('click', () => ws.emit('op:undo'));

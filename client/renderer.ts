@@ -10,6 +10,7 @@ export class CanvasLayers {
   private hudCtx: CanvasRenderingContext2D;
   private width = 0;
   private height = 0;
+  private dpr = 1;
   private rafId: number | null = null;
   private cursors = new Map<string, CursorInfo>();
   private previews = new Map<string, { tool: Tool; color: string; size: number; from: Point; to: Point }>();
@@ -26,15 +27,39 @@ export class CanvasLayers {
   }
 
   private resizeToWindow() {
-    const w = Math.floor(window.innerWidth);
-    const h = Math.floor(window.innerHeight);
-    if (w === this.width && h === this.height) return;
-    // Snapshot base before resize
-    const img = this.baseCtx.getImageData(0, 0, this.base.width, this.base.height);
-    for (const c of [this.base, this.live, this.hud]) { c.width = w; c.height = h; }
-    this.width = w; this.height = h;
-    // restore base
-    try { this.baseCtx.putImageData(img, 0, 0); } catch {}
+    const displayW = Math.floor(window.innerWidth);
+    const displayH = Math.floor(window.innerHeight);
+    const dpr = Math.max(1, Math.floor((window.devicePixelRatio || 1) * 100) / 100);
+    const dimensionChanged = displayW !== this.width || displayH !== this.height;
+    const dprChanged = dpr !== this.dpr;
+    if (!dimensionChanged && !dprChanged) return;
+
+    // Snapshot base into an offscreen canvas before resize to preserve content
+    const prev = document.createElement('canvas');
+    prev.width = this.base.width;
+    prev.height = this.base.height;
+    const prevCtx = prev.getContext('2d');
+    if (prevCtx) prevCtx.drawImage(this.base, 0, 0);
+
+    // Resize all canvases to device pixels
+    for (const c of [this.base, this.live, this.hud]) {
+      c.width = Math.max(1, Math.floor(displayW * dpr));
+      c.height = Math.max(1, Math.floor(displayH * dpr));
+      // CSS size is controlled by stylesheet (100vw/100vh)
+    }
+    this.width = displayW; this.height = displayH; this.dpr = dpr;
+
+    // Reset transforms to map CSS pixels to device pixels
+    for (const ctx of [this.baseCtx, this.liveCtx, this.hudCtx]) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    // Restore previous image scaled to new display size (draw in CSS pixel space)
+    try {
+      if (prev.width && prev.height) {
+        this.baseCtx.drawImage(prev, 0, 0, this.width, this.height);
+      }
+    } catch {}
   }
 
   clearBase() {

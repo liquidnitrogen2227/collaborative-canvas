@@ -18,6 +18,7 @@ Then open two browser windows to http://localhost:3000 and draw.
 - server/drawing-state.ts – authoritative stroke history with global undo/redo
 - client/index.html – layered canvases (base/live/hud) + toolbar
 - client/style.css – minimal styles
+- Mobile-friendly responsive toolbar and high-DPI canvas rendering
 - client/renderer.ts – multi-layer canvas renderer (no path bridging)
 - client/websocket.ts – typed Socket.io client
 - client/main.ts – tool handling, streaming, state replay, cursors, undo/redo
@@ -40,6 +41,19 @@ Open two tabs at http://localhost:3000 and draw. You’ll see live strokes and c
 - In-memory history only (no persistence). Deploying multiple instances would need shared state (e.g., Redis pub/sub + store).
 - Global undo/redo is LIFO across all users (last operation wins), capped at 5 consecutive undos to keep interactions snappy.
 - Collision/conflict resolution is server-order based. Eraser uses compositing to non-destructively remove pixels from prior ops.
+
+## Mobile compatibility
+
+This app includes several mobile-focused improvements:
+
+- Responsive toolbar that wraps on small screens and can be collapsed via a toggle button (appears under ~700px width).
+- High-DPI rendering: canvases allocate device pixels and map CSS pixels through a transform for crisp results on Retina devices.
+- Touch drawing refinements: pointer capture to avoid dropouts, `touch-action: none` to prevent scroll/zoom while drawing, and a guarded `touchmove` handler to stop pull-to-refresh during strokes.
+- Orientation changes and resizes preserve content by snapshotting and redrawing after canvas resize.
+
+Future ideas (not yet implemented):
+- Optional Wake Lock to keep the screen on while collaborating.
+- Two-finger pan and pinch-zoom for an infinite canvas.
 
 ## Deploy to Render (recommended for realtime)
 

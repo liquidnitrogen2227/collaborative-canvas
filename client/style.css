@@ -18,6 +18,32 @@ html, body {
   align-items: center;
 }
 
+@media (max-width: 700px) {
+  #toolbar {
+    flex-wrap: wrap;
+    max-width: calc(100vw - 16px);
+  }
+  #toolbar button, #toolbar label, #toolbar input[type=color] {
+    flex: 1 1 30%;
+    min-width: 90px;
+  }
+  #users { flex: 1 1 100%; order: 99; }
+}
+
+/* Compact phones */
+@media (max-width: 480px) {
+  #toolbar {
+    font-size: 12px;
+    gap: 6px;
+    padding: 6px 8px;
+  }
+  #toolbar button, #toolbar label, #toolbar input[type=color] {
+    flex: 1 1 45%;
+    min-width: 70px;
+  }
+  #toolbar input[type=range] { width: 100%; }
+}
+
 #stage {
   position: fixed;
   inset: 0;
@@ -29,6 +55,7 @@ html, body {
   height: 100vh;
   display: block;
 }
+#stage, #stage canvas { touch-action: none; }
 #base { background: #fff; }
 #live { pointer-events: none; }
 #hud { pointer-events: none; }
@@ -42,3 +69,11 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Improve tap targets */
+#toolbar button, #toolbar input, #toolbar label {
+  min-height: 36px;
+}
+
+/* Allow toolbar to collapse on mobile if desired */
+#toolbar.collapsed .hide-when-collapsed { display: none; }
