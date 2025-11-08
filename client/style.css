@@ -36,6 +36,10 @@ html, body {
     font-size: 12px;
     gap: 6px;
     padding: 6px 8px;
+
+/* Pan cursors */
+body.panning #stage { cursor: grab; }
+body.panning-active #stage { cursor: grabbing; }
   }
   #toolbar button, #toolbar label, #toolbar input[type=color] {
     flex: 1 1 45%;

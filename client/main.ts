@@ -18,6 +18,7 @@ const rectBtn = document.getElementById('tool-rect') as HTMLButtonElement;
 const ellipseBtn = document.getElementById('tool-ellipse') as HTMLButtonElement;
 const toggleToolbarBtn = document.getElementById('toggle-toolbar') as HTMLButtonElement | null;
 const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+const resetViewBtn = document.getElementById('reset-view') as HTMLButtonElement | null;
 
 const layers = new CanvasLayers(base, live, hud);
 const ws = new WSClient();
@@ -60,33 +61,54 @@ function size() { return Number(sizeInput.value); }
 function color() { return colorInput.value; }
 
 function pointerPos(e: PointerEvent) {
-  return { x: e.clientX, y: e.clientY };
+  // screen coords -> world coords via renderer viewport
+  return layers.screenToWorld({ x: e.clientX, y: e.clientY });
 }
 
 hud.addEventListener('pointerdown', (e) => { e.preventDefault(); }); // prevent text selection
 live.addEventListener('pointerdown', (e) => { e.preventDefault(); });
 base.addEventListener('pointerdown', (e) => {
+  const screen = { x: e.clientX, y: e.clientY };
+  if (isPanningMode) {
+    document.body.classList.add('panning-active');
+    panStart = screen;
+    const vp = layers.getViewport();
+    viewAtPanStart = { offsetX: vp.offsetX, offsetY: vp.offsetY, scale: vp.scale };
+    try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+    return;
+  }
   const p = pointerPos(e);
   isDown = true;
   currentStrokeId = genId();
   lastPoint = p;
   localPoints.length = 0; localPoints.push(p);
   ws.emit('stroke:begin', { strokeId: currentStrokeId, tool, color: color(), size: size(), x: p.x, y: p.y });
-  // Ensure we keep receiving events even if finger/mouse leaves canvas slightly
   try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch {}
 });
 
+let isPanningMode = false; // toggled by spacebar
+let isPanning = false;
+let panStart: { x: number; y: number } | null = null;
+let viewAtPanStart: { offsetX: number; offsetY: number; scale: number } | null = null;
+
 window.addEventListener('pointermove', (e) => {
+  const screen = { x: e.clientX, y: e.clientY };
+  if (isPanningMode && panStart && viewAtPanStart) {
+    const dx = screen.x - panStart.x;
+    const dy = screen.y - panStart.y;
+    layers.setViewport(viewAtPanStart.scale, viewAtPanStart.offsetX + dx, viewAtPanStart.offsetY + dy);
+    redraw();
+    return;
+  }
   const p = pointerPos(e);
   ws.emit('cursor', { x: p.x, y: p.y });
   if (!isDown || !currentStrokeId || !lastPoint) return;
-  // live preview: brush -> live layer; eraser -> base; shapes -> HUD preview (do not mark incremental for shapes)
   if (tool === 'brush') {
     layers.drawLiveSegment(tool, color(), size(), lastPoint, p);
   } else if (tool === 'eraser') {
     layers.drawBaseSegment(tool, color(), size(), lastPoint, p);
     if (currentStrokeId) incrementalApplied.add(currentStrokeId);
-  } else { // shape tools
+  } else {
     layers.setShapePreview(currentStrokeId, tool, color(), size(), localPoints[0], p);
   }
   localPoints.push(p);
@@ -95,6 +117,7 @@ window.addEventListener('pointermove', (e) => {
 });
 
 window.addEventListener('pointerup', (e) => {
+  if (isPanningMode) { panStart = null; viewAtPanStart = null; document.body.classList.remove('panning-active'); }
   if (!isDown) return;
   isDown = false;
   if (currentStrokeId) {
@@ -142,7 +165,32 @@ clearGlobalBtn.addEventListener('click', () => ws.emit('op:clear'));
 window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { ws.emit('op:undo'); e.preventDefault(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { ws.emit('op:redo'); e.preventDefault(); }
+  if (e.key === ' ') { isPanningMode = true; e.preventDefault(); document.body.classList.add('panning'); }
 });
+window.addEventListener('keyup', (e) => { if (e.key === ' ') { isPanningMode = false; panStart = null; viewAtPanStart = null; document.body.classList.remove('panning'); document.body.classList.remove('panning-active'); } });
+
+// Zoom with wheel (Ctrl+wheel or normal wheel). Zoom centered at pointer.
+window.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const vp = layers.getViewport();
+  if (e.ctrlKey) {
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const newScale = vp.scale * zoomFactor;
+    const worldBefore = layers.screenToWorld({ x: e.clientX, y: e.clientY });
+    layers.setViewport(newScale, vp.offsetX, vp.offsetY);
+    const screenAfter = { x: worldBefore.x * newScale + vp.offsetX, y: worldBefore.y * newScale + vp.offsetY };
+    const dx = e.clientX - screenAfter.x;
+    const dy = e.clientY - screenAfter.y;
+    const vp2 = layers.getViewport();
+    layers.setViewport(vp2.scale, vp2.offsetX + dx, vp2.offsetY + dy);
+  } else {
+    // Pan with wheel
+    layers.setViewport(vp.scale, vp.offsetX - e.deltaX, vp.offsetY - e.deltaY);
+  }
+  redraw();
+}, { passive: false });
+
+resetViewBtn?.addEventListener('click', () => { layers.setViewport(1, 0, 0); redraw(); });
 
 // Maintain active remote strokes local reconstruction for smoother live lines
 const remoteLast = new Map<string, { x: number; y: number; tool: 'brush'|'eraser'|'line'|'rect'|'ellipse'; color: string; size: number }>();
@@ -198,6 +246,7 @@ ws.on('user:list', (users: User[]) => {
 
 ws.on('cursor', (p) => {
   if (!p.userId) return;
+  // p.x/p.y already world coords
   layers.setCursor(p.userId, p.x, p.y, p.color || '#333', p.name || 'User');
 });
 

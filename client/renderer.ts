@@ -11,6 +11,9 @@ export class CanvasLayers {
   private width = 0;
   private height = 0;
   private dpr = 1;
+  private scale = 1;
+  private offsetX = 0;
+  private offsetY = 0;
   private rafId: number | null = null;
   private cursors = new Map<string, CursorInfo>();
   private previews = new Map<string, { tool: Tool; color: string; size: number; from: Point; to: Point }>();
@@ -26,6 +29,24 @@ export class CanvasLayers {
     this.startHudLoop();
   }
 
+  // Viewport API
+  setViewport(scale: number, offsetX: number, offsetY: number) {
+    this.scale = Math.max(0.1, Math.min(10, scale));
+    this.offsetX = offsetX;
+    this.offsetY = offsetY;
+    this.applyTransforms();
+  }
+  getViewport() { return { scale: this.scale, offsetX: this.offsetX, offsetY: this.offsetY }; }
+  screenToWorld(p: Point): Point {
+    return { x: (p.x - this.offsetX) / this.scale, y: (p.y - this.offsetY) / this.scale };
+  }
+
+  private applyTransforms() {
+    for (const ctx of [this.baseCtx, this.liveCtx, this.hudCtx]) {
+      ctx.setTransform(this.dpr * this.scale, 0, 0, this.dpr * this.scale, this.dpr * this.offsetX, this.dpr * this.offsetY);
+    }
+  }
+
   private resizeToWindow() {
     const displayW = Math.floor(window.innerWidth);
     const displayH = Math.floor(window.innerHeight);
@@ -34,37 +55,42 @@ export class CanvasLayers {
     const dprChanged = dpr !== this.dpr;
     if (!dimensionChanged && !dprChanged) return;
 
-    // Snapshot base into an offscreen canvas before resize to preserve content
+    // Snapshot base before resize
     const prev = document.createElement('canvas');
     prev.width = this.base.width;
     prev.height = this.base.height;
     const prevCtx = prev.getContext('2d');
     if (prevCtx) prevCtx.drawImage(this.base, 0, 0);
 
-    // Resize all canvases to device pixels
+    // Resize to device pixels
     for (const c of [this.base, this.live, this.hud]) {
       c.width = Math.max(1, Math.floor(displayW * dpr));
       c.height = Math.max(1, Math.floor(displayH * dpr));
-      // CSS size is controlled by stylesheet (100vw/100vh)
     }
     this.width = displayW; this.height = displayH; this.dpr = dpr;
 
-    // Reset transforms to map CSS pixels to device pixels
+    // Reset to DPR only, then apply viewport
     for (const ctx of [this.baseCtx, this.liveCtx, this.hudCtx]) {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
+    this.applyTransforms();
 
-    // Restore previous image scaled to new display size (draw in CSS pixel space)
-    try {
-      if (prev.width && prev.height) {
-        this.baseCtx.drawImage(prev, 0, 0, this.width, this.height);
-      }
-    } catch {}
+    // Restore previous pixels without transforms
+    if (prev.width && prev.height) {
+      this.baseCtx.setTransform(1, 0, 0, 1, 0, 0);
+      this.baseCtx.clearRect(0, 0, this.base.width, this.base.height);
+      this.baseCtx.drawImage(prev, 0, 0);
+      this.applyTransforms();
+    }
   }
 
-  clearBase() {
-    this.baseCtx.clearRect(0, 0, this.width, this.height);
+  private clearPixelAligned(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
+
+  clearBase() { this.clearPixelAligned(this.baseCtx, this.base); this.applyTransforms(); }
+  clearLive() { this.clearPixelAligned(this.liveCtx, this.live); this.applyTransforms(); }
 
   replay(history: StrokeOp[]) {
     this.clearBase();
@@ -74,7 +100,6 @@ export class CanvasLayers {
   private applyOpToBase(op: StrokeOp) {
     const ctx = this.baseCtx;
     if (op.tool === 'line' || op.tool === 'rect' || op.tool === 'ellipse') {
-      // shape rendering inline
       const from = op.points[0];
       const to = op.points[op.points.length - 1] || from;
       ctx.save();
@@ -101,20 +126,17 @@ export class CanvasLayers {
       ctx.globalCompositeOperation = 'source-over';
       ctx.strokeStyle = op.color;
     }
-    ctx.beginPath();
     const pts = op.points;
     if (!pts.length) { ctx.restore(); return; }
+    ctx.beginPath();
     ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) {
-      const p = pts[i];
-      ctx.lineTo(p.x, p.y);
-    }
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
     ctx.stroke();
     ctx.closePath();
     ctx.restore();
   }
 
-  // Live incremental segment. For brush: draw on live layer (overlay). For eraser: apply directly to base for immediate visual feedback.
+  // Live incremental segment. Brush -> live; Eraser -> base
   drawLiveSegment(tool: Tool, color: string, size: number, from: Point, to: Point) {
     const ctx = tool === 'eraser' ? this.baseCtx : this.liveCtx;
     ctx.save();
@@ -136,7 +158,7 @@ export class CanvasLayers {
     ctx.restore();
   }
 
-  // Explicitly draw a segment onto the base canvas (used for optimistic local brush and immediate remote rendering)
+  // Explicitly draw onto base
   drawBaseSegment(tool: Tool, color: string, size: number, from: Point, to: Point) {
     const ctx = this.baseCtx;
     ctx.save();
@@ -158,14 +180,7 @@ export class CanvasLayers {
     ctx.restore();
   }
 
-  // Apply a committed operation to the base without full replay
-  applyCommittedOp(op: StrokeOp) {
-    this.applyOpToBase(op);
-  }
-
-  clearLive() {
-    this.liveCtx.clearRect(0, 0, this.width, this.height);
-  }
+  applyCommittedOp(op: StrokeOp) { this.applyOpToBase(op); }
 
   clearAllPreviews() { this.previews.clear(); }
 
@@ -176,7 +191,8 @@ export class CanvasLayers {
 
   private startHudLoop() {
     const draw = () => {
-      this.hudCtx.clearRect(0, 0, this.width, this.height);
+      this.clearPixelAligned(this.hudCtx, this.hud);
+      this.applyTransforms();
       for (const c of this.cursors.values()) this.drawCursor(c);
       for (const p of this.previews.values()) this.drawPreview(p);
       this.rafId = requestAnimationFrame(draw);
@@ -196,7 +212,6 @@ export class CanvasLayers {
     ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
-    // label
     ctx.font = '12px sans-serif';
     ctx.fillStyle = '#000';
     ctx.strokeStyle = '#fff';

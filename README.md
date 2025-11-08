@@ -42,6 +42,12 @@ Open two tabs at http://localhost:3000 and draw. You’ll see live strokes and c
 - Global undo/redo is LIFO across all users (last operation wins), capped at 5 consecutive undos to keep interactions snappy.
 - Collision/conflict resolution is server-order based. Eraser uses compositing to non-destructively remove pixels from prior ops.
 
+## Infinite canvas & navigation
+
+- Pan: hold Space and drag, or use the mouse wheel (no Ctrl) to scroll/pan.
+- Zoom: Ctrl + mouse wheel; zoom is centered under the pointer. Use the "Reset View" button to return to 100%.
+- All strokes are stored in world coordinates and render correctly at any zoom level.
+
 ## Mobile compatibility
 
 This app includes several mobile-focused improvements:
