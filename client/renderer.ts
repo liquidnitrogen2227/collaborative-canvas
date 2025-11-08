@@ -71,9 +71,9 @@ export class CanvasLayers {
     ctx.restore();
   }
 
-  // Live incremental segment: independent path per segment to avoid bridging
+  // Live incremental segment. For brush: draw on live layer (overlay). For eraser: apply directly to base for immediate visual feedback.
   drawLiveSegment(tool: Tool, color: string, size: number, from: Point, to: Point) {
-    const ctx = this.liveCtx;
+    const ctx = tool === 'eraser' ? this.baseCtx : this.liveCtx;
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
