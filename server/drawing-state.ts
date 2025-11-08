@@ -1,5 +1,7 @@
 import { RoomState, StrokeOp, Tool } from './rooms';
 
+const MAX_UNDO_STEPS = 5;
+
 export function beginStroke(room: RoomState, strokeId: string, userId: string, tool: Tool, color: string, size: number, x: number, y: number) {
   // starting a new stroke cancels redo history (new branch)
   room.redoStack = [];
@@ -18,10 +20,14 @@ export function endStroke(room: RoomState, strokeId: string): StrokeOp | null {
   if (!op) return null;
   room.active.delete(strokeId);
   room.history.push(op);
+  // Reset undo window when a new op is committed
+  room.redoStack = [];
   return op;
 }
 
 export function undo(room: RoomState): StrokeOp | null {
+  // Enforce max undo window size relative to current head
+  if (room.redoStack.length >= MAX_UNDO_STEPS) return null;
   const op = room.history.pop() || null;
   if (op) room.redoStack.push(op);
   return op;

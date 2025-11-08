@@ -1,4 +1,4 @@
-export type Tool = 'brush' | 'eraser';
+export type Tool = 'brush' | 'eraser' | 'line' | 'rect' | 'ellipse';
 export type Point = { x: number; y: number };
 export type StrokeOp = { id: string; tool: Tool; color: string; size: number; points: Point[] };
 
@@ -12,6 +12,7 @@ export class CanvasLayers {
   private height = 0;
   private rafId: number | null = null;
   private cursors = new Map<string, CursorInfo>();
+  private previews = new Map<string, { tool: Tool; color: string; size: number; from: Point; to: Point }>();
 
   constructor(private base: HTMLCanvasElement, private live: HTMLCanvasElement, private hud: HTMLCanvasElement) {
     const b = base.getContext('2d');
@@ -47,6 +48,23 @@ export class CanvasLayers {
 
   private applyOpToBase(op: StrokeOp) {
     const ctx = this.baseCtx;
+    if (op.tool === 'line' || op.tool === 'rect' || op.tool === 'ellipse') {
+      // shape rendering inline
+      const from = op.points[0];
+      const to = op.points[op.points.length - 1] || from;
+      ctx.save();
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.lineWidth = op.size;
+      ctx.strokeStyle = op.color;
+      switch (op.tool) {
+        case 'line': this.drawLine(ctx, from, to); break;
+        case 'rect': this.drawRect(ctx, from, to); break;
+        case 'ellipse': this.drawEllipse(ctx, from, to); break;
+      }
+      ctx.restore();
+      return;
+    }
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
@@ -93,9 +111,38 @@ export class CanvasLayers {
     ctx.restore();
   }
 
+  // Explicitly draw a segment onto the base canvas (used for optimistic local brush and immediate remote rendering)
+  drawBaseSegment(tool: Tool, color: string, size: number, from: Point, to: Point) {
+    const ctx = this.baseCtx;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = size;
+    if (tool === 'eraser') {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.strokeStyle = 'rgba(0,0,0,1)';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = color;
+    }
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.closePath();
+    ctx.restore();
+  }
+
+  // Apply a committed operation to the base without full replay
+  applyCommittedOp(op: StrokeOp) {
+    this.applyOpToBase(op);
+  }
+
   clearLive() {
     this.liveCtx.clearRect(0, 0, this.width, this.height);
   }
+
+  clearAllPreviews() { this.previews.clear(); }
 
   setCursor(userId: string, x: number, y: number, color: string, name: string) {
     this.cursors.set(userId, { x, y, color, name });
@@ -106,6 +153,7 @@ export class CanvasLayers {
     const draw = () => {
       this.hudCtx.clearRect(0, 0, this.width, this.height);
       for (const c of this.cursors.values()) this.drawCursor(c);
+      for (const p of this.previews.values()) this.drawPreview(p);
       this.rafId = requestAnimationFrame(draw);
     };
     this.rafId = requestAnimationFrame(draw);
@@ -132,5 +180,47 @@ export class CanvasLayers {
     ctx.strokeText(label, c.x + 8, c.y - 8);
     ctx.fillText(label, c.x + 8, c.y - 8);
     ctx.restore();
+  }
+
+  setShapePreview(strokeId: string, tool: Tool, color: string, size: number, from: Point, to: Point) {
+    this.previews.set(strokeId, { tool, color, size, from, to });
+  }
+  clearPreview(strokeId: string) { this.previews.delete(strokeId); }
+
+  private drawPreview(p: { tool: Tool; color: string; size: number; from: Point; to: Point }) {
+    const ctx = this.hudCtx;
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = p.size;
+    ctx.strokeStyle = p.color;
+    ctx.setLineDash([4, 4]);
+    switch (p.tool) {
+      case 'line': this.drawLine(ctx, p.from, p.to); break;
+      case 'rect': this.drawRect(ctx, p.from, p.to); break;
+      case 'ellipse': this.drawEllipse(ctx, p.from, p.to); break;
+    }
+    ctx.restore();
+  }
+
+  private drawLine(ctx: CanvasRenderingContext2D, from: Point, to: Point) {
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    ctx.closePath();
+  }
+  private drawRect(ctx: CanvasRenderingContext2D, from: Point, to: Point) {
+    const x = Math.min(from.x, to.x), y = Math.min(from.y, to.y);
+    const w = Math.abs(to.x - from.x), h = Math.abs(to.y - from.y);
+    ctx.strokeRect(x, y, w, h);
+  }
+  private drawEllipse(ctx: CanvasRenderingContext2D, from: Point, to: Point) {
+    const cx = (from.x + to.x) / 2; const cy = (from.y + to.y) / 2;
+    const rx = Math.abs(to.x - from.x) / 2; const ry = Math.abs(to.y - from.y) / 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.closePath();
   }
 }

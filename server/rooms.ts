@@ -5,7 +5,7 @@ export type User = {
 };
 
 export type Point = { x: number; y: number };
-export type Tool = 'brush' | 'eraser';
+export type Tool = 'brush' | 'eraser' | 'line' | 'rect' | 'ellipse';
 
 export type StrokeOp = {
   id: string; // strokeId

@@ -9,21 +9,31 @@ const colorInput = document.getElementById('color') as HTMLInputElement;
 const undoBtn = document.getElementById('undo') as HTMLButtonElement;
 const redoBtn = document.getElementById('redo') as HTMLButtonElement;
 const clearBtn = document.getElementById('clear') as HTMLButtonElement;
+const clearGlobalBtn = document.getElementById('clear-global') as HTMLButtonElement;
 const usersSpan = document.getElementById('users') as HTMLSpanElement;
 const brushBtn = document.getElementById('tool-brush') as HTMLButtonElement;
 const eraserBtn = document.getElementById('tool-eraser') as HTMLButtonElement;
+const lineBtn = document.getElementById('tool-line') as HTMLButtonElement;
+const rectBtn = document.getElementById('tool-rect') as HTMLButtonElement;
+const ellipseBtn = document.getElementById('tool-ellipse') as HTMLButtonElement;
 
 const layers = new CanvasLayers(base, live, hud);
 const ws = new WSClient();
 
-let tool: 'brush' | 'eraser' = 'brush';
-function setTool(t: 'brush'|'eraser') {
+let tool: 'brush' | 'eraser' | 'line' | 'rect' | 'ellipse' = 'brush';
+function setTool(t: 'brush'|'eraser'|'line'|'rect'|'ellipse') {
   tool = t;
   brushBtn.classList.toggle('active', t === 'brush');
   eraserBtn.classList.toggle('active', t === 'eraser');
+  lineBtn.classList.toggle('active', t === 'line');
+  rectBtn.classList.toggle('active', t === 'rect');
+  ellipseBtn.classList.toggle('active', t === 'ellipse');
 }
 brushBtn.addEventListener('click', () => setTool('brush'));
 eraserBtn.addEventListener('click', () => setTool('eraser'));
+lineBtn.addEventListener('click', () => setTool('line'));
+rectBtn.addEventListener('click', () => setTool('rect'));
+ellipseBtn.addEventListener('click', () => setTool('ellipse'));
 
 let isDown = false;
 let currentStrokeId: string | null = null;
@@ -53,8 +63,15 @@ window.addEventListener('pointermove', (e) => {
   const p = pointerPos(e);
   ws.emit('cursor', { x: p.x, y: p.y });
   if (!isDown || !currentStrokeId || !lastPoint) return;
-  // live segment draw
-  layers.drawLiveSegment(tool, color(), size(), lastPoint, p);
+  // live preview: brush -> live layer; eraser -> base; shapes -> HUD preview (do not mark incremental for shapes)
+  if (tool === 'brush') {
+    layers.drawLiveSegment(tool, color(), size(), lastPoint, p);
+  } else if (tool === 'eraser') {
+    layers.drawBaseSegment(tool, color(), size(), lastPoint, p);
+    if (currentStrokeId) incrementalApplied.add(currentStrokeId);
+  } else { // shape tools
+    layers.setShapePreview(currentStrokeId, tool, color(), size(), localPoints[0], p);
+  }
   localPoints.push(p);
   ws.emit('stroke:point', { strokeId: currentStrokeId, x: p.x, y: p.y });
   lastPoint = p;
@@ -65,9 +82,22 @@ window.addEventListener('pointerup', () => {
   isDown = false;
   if (currentStrokeId) {
     ws.emit('stroke:end', { strokeId: currentStrokeId });
-    // commit locally (will also arrive via op:commit; we can optimistically apply)
-  // Server will broadcast op:commit. We wait for it to update base canvas.
-    // merge to base by clearing live then drawing final stroke onto base when commit comes
+    // Optimistic local commit for shapes so eraser can act immediately
+    if (tool === 'line' || tool === 'rect' || tool === 'ellipse') {
+      const op: StrokeOp = {
+        id: currentStrokeId,
+        userId: ws.id() || 'me',
+        tool,
+        color: color(),
+        size: size(),
+        points: [...localPoints],
+        ts: Date.now(),
+      };
+      layers.applyCommittedOp(op);
+      // skip re-applying when server commit arrives
+      incrementalApplied.add(op.id);
+      layers.clearAllPreviews?.();
+    }
     currentStrokeId = null;
     lastPoint = null;
     localPoints.length = 0;
@@ -77,7 +107,8 @@ window.addEventListener('pointerup', () => {
 
 undoBtn.addEventListener('click', () => ws.emit('op:undo'));
 redoBtn.addEventListener('click', () => ws.emit('op:redo'));
-clearBtn.addEventListener('click', () => layers.clearBase());
+clearBtn.addEventListener('click', () => { layers.clearBase(); layers.clearLive(); layers.clearAllPreviews?.(); });
+clearGlobalBtn.addEventListener('click', () => ws.emit('op:clear'));
 
 window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { ws.emit('op:undo'); e.preventDefault(); }
@@ -85,35 +116,52 @@ window.addEventListener('keydown', (e) => {
 });
 
 // Maintain active remote strokes local reconstruction for smoother live lines
-const remoteLast = new Map<string, { x: number; y: number; tool: 'brush'|'eraser'; color: string; size: number }>();
-
+const remoteLast = new Map<string, { x: number; y: number; tool: 'brush'|'eraser'|'line'|'rect'|'ellipse'; color: string; size: number }>();
+const remoteOrigin = new Map<string, { x: number; y: number }>();
 ws.on('stroke:begin', ({ strokeId, tool, color, size, x, y, userId }) => {
-  if (userId === ws.id()) return; // ignore own
+  if (userId === ws.id()) return;
   remoteLast.set(strokeId, { x, y, tool, color, size });
+  remoteOrigin.set(strokeId, { x, y });
 });
+
 ws.on('stroke:point', ({ strokeId, x, y, userId }) => {
   if (userId === ws.id()) return;
   const last = remoteLast.get(strokeId); if (!last) return;
-  layers.drawLiveSegment(last.tool, last.color, last.size, { x: last.x, y: last.y }, { x, y });
+  if (last.tool === 'brush' || last.tool === 'eraser') {
+    layers.drawBaseSegment(last.tool, last.color, last.size, { x: last.x, y: last.y }, { x, y });
+    incrementalApplied.add(strokeId); // only mark base-applied strokes
+  } else {
+    // remote shape preview; anchor is first point stored at stroke begin
+    const origin = remoteOrigin.get(strokeId) || { x: last.x, y: last.y };
+    layers.setShapePreview(strokeId, last.tool, last.color, last.size, origin, { x, y });
+  }
   last.x = x; last.y = y;
 });
 ws.on('stroke:end', ({ strokeId, userId }) => {
   if (userId === ws.id()) return;
   remoteLast.delete(strokeId);
+  remoteOrigin.delete(strokeId);
+  layers.clearPreview(strokeId);
   // live canvas will be cleared after commit event
 });
 
 // Commit operations update base canvas
 const history: StrokeOp[] = [];
+const incrementalApplied = new Set<string>();
 function redraw() { layers.replay(history); }
 
 ws.on('op:commit', (op) => {
   history.push(op);
-  redraw();
+  if (incrementalApplied.has(op.id)) {
+    // already drawn incrementally
+    incrementalApplied.delete(op.id);
+  } else {
+    layers.applyCommittedOp(op);
+  }
   layers.clearLive();
 });
-ws.on('snapshot', (snap) => { history.length = 0; history.push(...snap.history); redraw(); });
-ws.on('state:snapshot', (snap) => { history.length = 0; history.push(...snap.history); redraw(); });
+ws.on('snapshot', (snap) => { history.length = 0; history.push(...snap.history); layers.clearAllPreviews?.(); redraw(); });
+ws.on('state:snapshot', (snap) => { history.length = 0; history.push(...snap.history); layers.clearAllPreviews?.(); redraw(); });
 
 ws.on('user:list', (users: User[]) => {
   usersSpan.textContent = users.map(u => u.name).join(', ');

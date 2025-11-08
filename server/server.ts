@@ -46,7 +46,7 @@ io.on('connection', (socket) => {
   });
 
   // Stroke streaming
-  socket.on('stroke:begin', (p: { strokeId: string; tool: 'brush'|'eraser'; color: string; size: number; x: number; y: number }) => {
+  socket.on('stroke:begin', (p: { strokeId: string; tool: 'brush'|'eraser'|'line'|'rect'|'ellipse'; color: string; size: number; x: number; y: number }) => {
     const r = rooms.get(roomId);
     beginStroke(r, p.strokeId, socket.id, p.tool, p.color, p.size, p.x, p.y);
     socket.to(roomId).emit('stroke:begin', { userId: socket.id, ...p });
@@ -72,6 +72,14 @@ io.on('connection', (socket) => {
     const r = rooms.get(roomId);
     const changed = redo(r);
     if (changed) io.to(roomId).emit('state:snapshot', snapshot(r));
+  });
+
+  socket.on('op:clear', () => {
+    const r = rooms.get(roomId);
+    r.history = [];
+    r.redoStack = [];
+    r.active.clear();
+    io.to(roomId).emit('state:snapshot', snapshot(r));
   });
 
   socket.on('cursor', (p: { x: number; y: number }) => {

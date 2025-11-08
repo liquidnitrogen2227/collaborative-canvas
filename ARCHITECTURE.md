@@ -53,8 +53,8 @@ Server keeps:
 - `redoStack[]`: strokes removed via undo for possible restoration.
 - `active`: map of in-progress strokes receiving point updates.
 
-Global Undo: pop last element of `history` (regardless of author) -> push to `redoStack` -> broadcast `state:snapshot`.
-Global Redo: pop last from `redoStack` -> append to `history` -> broadcast `state:snapshot`.
+Global Undo: pop last element of `history` (regardless of author) -> push to `redoStack` -> broadcast `state:snapshot`. Server enforces a maximum of 5 undo steps relative to the current head (no more than 5 entries in `redoStack`).
+Global Redo: pop last from `redoStack` -> append to `history` -> broadcast `state:snapshot`. Redo is naturally limited by prior undos (max 5).
 Snapshots trigger full replay on clients (clear base; re-render each stroke sequentially).
 
 Eraser Tool: uses `globalCompositeOperation = 'destination-out'` during stroke replay, enabling non-destructive removal without altering underlying stroke data (logical inversion per segment).

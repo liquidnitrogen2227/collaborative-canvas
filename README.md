@@ -38,7 +38,7 @@ Open two tabs at http://localhost:3000 and draw. You’ll see live strokes and c
 ## Notes / Limitations
 
 - In-memory history only (no persistence). Deploying multiple instances would need shared state (e.g., Redis pub/sub + store).
-- Global undo/redo is LIFO across all users (last operation wins), by design per assignment.
+- Global undo/redo is LIFO across all users (last operation wins), capped at 5 consecutive undos to keep interactions snappy.
 - Collision/conflict resolution is server-order based. Eraser uses compositing to non-destructively remove pixels from prior ops.
 
 ## Deploy to Render (recommended for realtime)

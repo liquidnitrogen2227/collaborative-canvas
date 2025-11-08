@@ -1,13 +1,13 @@
 import { io, Socket } from 'socket.io-client';
 
-export type StrokeBegin = { strokeId: string; tool: 'brush'|'eraser'; color: string; size: number; x: number; y: number };
+export type StrokeBegin = { strokeId: string; tool: 'brush'|'eraser'|'line'|'rect'|'ellipse'; color: string; size: number; x: number; y: number };
 export type StrokePoint = { strokeId: string; x: number; y: number };
 export type StrokeEnd = { strokeId: string };
 export type Cursor = { x: number; y: number };
 export type StrokeOp = {
   id: string;
   userId: string;
-  tool: 'brush'|'eraser';
+  tool: 'brush'|'eraser'|'line'|'rect'|'ellipse';
   color: string;
   size: number;
   points: { x: number; y: number }[];
@@ -42,5 +42,6 @@ export class WSClient {
   emit(event: 'user:join', p: { roomId?: string; name?: string; color?: string }): void;
   emit(event: 'op:undo'): void;
   emit(event: 'op:redo'): void;
+  emit(event: 'op:clear'): void;
   emit(event: string, p?: any) { this.socket.emit(event, p); }
 }
