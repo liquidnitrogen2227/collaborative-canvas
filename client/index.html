@@ -8,11 +8,20 @@
   </head>
   <body>
     <div id="toolbar">
-      <label>Brush size <input id="size" type="range" min="1" max="20" value="4" /></label>
+      <label>Brush <input id="size" type="range" min="1" max="32" value="4" /></label>
       <input id="color" type="color" value="#000000" />
-      <button id="clear">Clear</button>
+      <button id="tool-brush" data-tool="brush" class="tool active">Brush</button>
+      <button id="tool-eraser" data-tool="eraser" class="tool">Eraser</button>
+      <button id="undo" title="Undo (Ctrl+Z)">Undo</button>
+      <button id="redo" title="Redo (Ctrl+Y)">Redo</button>
+      <span id="users"></span>
+      <button id="clear">Clear (local)</button>
     </div>
-    <canvas id="canvas"></canvas>
+    <div id="stage">
+      <canvas id="base"></canvas>
+      <canvas id="live"></canvas>
+      <canvas id="hud"></canvas>
+    </div>
   <script type="module" src="/build/bundle.js"></script>
   </body>
   </html>

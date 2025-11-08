@@ -18,9 +18,27 @@ html, body {
   align-items: center;
 }
 
-#canvas {
-  display: block;
+#stage {
+  position: fixed;
+  inset: 0;
+}
+#stage canvas {
+  position: absolute;
+  inset: 0;
   width: 100vw;
   height: 100vh;
-  background: #fff;
+  display: block;
+}
+#base { background: #fff; }
+#live { pointer-events: none; }
+#hud { pointer-events: none; }
+
+.tool.active { outline: 2px solid #333; }
+
+#users {
+  font-size: 12px;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

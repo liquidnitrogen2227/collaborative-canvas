@@ -1,9 +1,20 @@
 import { io, Socket } from 'socket.io-client';
 
-export type DrawBegin = { strokeId: string; x: number; y: number; color: string; size: number };
-export type DrawPoint = { strokeId: string; x: number; y: number };
-export type DrawEnd = { strokeId: string };
+export type StrokeBegin = { strokeId: string; tool: 'brush'|'eraser'; color: string; size: number; x: number; y: number };
+export type StrokePoint = { strokeId: string; x: number; y: number };
+export type StrokeEnd = { strokeId: string };
 export type Cursor = { x: number; y: number };
+export type StrokeOp = {
+  id: string;
+  userId: string;
+  tool: 'brush'|'eraser';
+  color: string;
+  size: number;
+  points: { x: number; y: number }[];
+  ts: number;
+};
+export type Snapshot = { history: StrokeOp[] };
+export type User = { id: string; name: string; color: string };
 
 export class WSClient {
   private socket: Socket;
@@ -14,15 +25,22 @@ export class WSClient {
 
   id(): string | undefined { return (this.socket as any).id; }
 
-  on(event: 'draw:begin', cb: (p: DrawBegin & { userId: string }) => void): void;
-  on(event: 'draw:point', cb: (p: DrawPoint & { userId: string }) => void): void;
-  on(event: 'draw:end', cb: (p: DrawEnd & { userId: string }) => void): void;
-  on(event: 'cursor', cb: (p: Cursor & { userId: string }) => void): void;
+  on(event: 'stroke:begin', cb: (p: StrokeBegin & { userId: string }) => void): void;
+  on(event: 'stroke:point', cb: (p: StrokePoint & { userId: string }) => void): void;
+  on(event: 'stroke:end', cb: (p: StrokeEnd & { userId: string }) => void): void;
+  on(event: 'cursor', cb: (p: Cursor & { userId: string; name?: string; color?: string }) => void): void;
+  on(event: 'op:commit', cb: (p: StrokeOp) => void): void;
+  on(event: 'snapshot', cb: (p: Snapshot) => void): void;
+  on(event: 'state:snapshot', cb: (p: Snapshot) => void): void;
+  on(event: 'user:list', cb: (p: User[]) => void): void;
   on(event: string, cb: (p: any) => void) { this.socket.on(event, cb); }
 
-  emit(event: 'draw:begin', p: DrawBegin): void;
-  emit(event: 'draw:point', p: DrawPoint): void;
-  emit(event: 'draw:end', p: DrawEnd): void;
+  emit(event: 'stroke:begin', p: StrokeBegin): void;
+  emit(event: 'stroke:point', p: StrokePoint): void;
+  emit(event: 'stroke:end', p: StrokeEnd): void;
   emit(event: 'cursor', p: Cursor): void;
-  emit(event: string, p: any) { this.socket.emit(event, p); }
+  emit(event: 'user:join', p: { roomId?: string; name?: string; color?: string }): void;
+  emit(event: 'op:undo'): void;
+  emit(event: 'op:redo'): void;
+  emit(event: string, p?: any) { this.socket.emit(event, p); }
 }

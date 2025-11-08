@@ -1,6 +1,6 @@
-# Collaborative Canvas (TypeScript minimal)
+# Collaborative Canvas (TypeScript + Socket.io)
 
-Simple real-time collaborative drawing using vanilla Canvas, Node.js, and Socket.io.
+Real-time multi-user drawing with brush/eraser, colors, stroke width, live cursors, and global undo/redo. Vanilla Canvas on the frontend and Node.js + Socket.io on the backend. No frameworks.
 
 ## Quick start
 
@@ -9,18 +9,20 @@ npm install
 npm start
 ```
 
-Then open two browser windows to:
-- http://localhost:3000 (local dev)
+Then open two browser windows to http://localhost:3000 and draw.
 
 ## What’s included
 
-- server/server.ts – Express + Socket.io server; serves static client and relays events
-- client/index.html – UI shell loading bundled script
+- server/server.ts – Express + Socket.io server; serves static client and manages protocol
+- server/rooms.ts – simple in-memory room + user registry
+- server/drawing-state.ts – authoritative stroke history with global undo/redo
+- client/index.html – layered canvases (base/live/hud) + toolbar
 - client/style.css – minimal styles
-- client/canvas.ts – tiny canvas drawing helper
-- client/websocket.ts – thin typed wrapper for socket.io-client
-- client/main.ts – wires input events to canvas + websocket
+- client/renderer.ts – multi-layer canvas renderer (no path bridging)
+- client/websocket.ts – typed Socket.io client
+- client/main.ts – tool handling, streaming, state replay, cursors, undo/redo
 - tsconfig.server.json – TypeScript config for server build (CommonJS, dist/)
+- render.yaml – Render.com blueprint (server + client on one origin)
 - package.json – scripts: build, dev, start
 
 ## Scripts
@@ -31,11 +33,13 @@ Then open two browser windows to:
 
 ## Testing multi-user
 
-Open two tabs at http://localhost:3000 and draw. You should see strokes mirrored across tabs live. A small cursor broadcast is implemented too for presence.
+Open two tabs at http://localhost:3000 and draw. You’ll see live strokes and cursors across tabs. Use Ctrl+Z / Ctrl+Y or toolbar buttons for global undo/redo.
 
 ## Notes / Limitations
 
-- No persistence or undo/redo yet; this is a minimal working baseline.
+- In-memory history only (no persistence). Deploying multiple instances would need shared state (e.g., Redis pub/sub + store).
+- Global undo/redo is LIFO across all users (last operation wins), by design per assignment.
+- Collision/conflict resolution is server-order based. Eraser uses compositing to non-destructively remove pixels from prior ops.
 
 ## Deploy to Render (recommended for realtime)
 
@@ -50,9 +54,8 @@ This app is designed to run server and client on the same origin (best for Socke
 4) Open your Render URL in two browser tabs and draw—strokes should sync in real time.
 
 Optional: You can also use `render.yaml` in this repo to spin up the service via “Blueprints” on Render.
-- Brush only; eraser, tools, rooms, and global history are future work.
 - Security hardening (CSP, rate limiting) is pared down for simplicity; add per your deployment needs.
 
 ## Time spent
 
-Initial scaffold and verification automated by scripts (≈30–45 min on a fresh machine).
+Initial scaffold → realtime → dual-canvas fix → tools/undo/redo/cursors/internals: ~4–6 hours.

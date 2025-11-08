@@ -1,110 +1,128 @@
-import { CanvasPad } from './canvas.ts';
-import { WSClient } from './websocket.ts';
+import { WSClient, StrokeOp, User } from './websocket.ts';
+import { CanvasLayers } from './renderer.ts';
 
-const canvas = document.getElementById('canvas') as HTMLCanvasElement;
+const base = document.getElementById('base') as HTMLCanvasElement;
+const live = document.getElementById('live') as HTMLCanvasElement;
+const hud = document.getElementById('hud') as HTMLCanvasElement;
 const sizeInput = document.getElementById('size') as HTMLInputElement;
 const colorInput = document.getElementById('color') as HTMLInputElement;
+const undoBtn = document.getElementById('undo') as HTMLButtonElement;
+const redoBtn = document.getElementById('redo') as HTMLButtonElement;
 const clearBtn = document.getElementById('clear') as HTMLButtonElement;
+const usersSpan = document.getElementById('users') as HTMLSpanElement;
+const brushBtn = document.getElementById('tool-brush') as HTMLButtonElement;
+const eraserBtn = document.getElementById('tool-eraser') as HTMLButtonElement;
 
-function fitCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-fitCanvas();
-window.addEventListener('resize', fitCanvas);
-
-const pad = new CanvasPad(canvas);
+const layers = new CanvasLayers(base, live, hud);
 const ws = new WSClient();
 
+let tool: 'brush' | 'eraser' = 'brush';
+function setTool(t: 'brush'|'eraser') {
+  tool = t;
+  brushBtn.classList.toggle('active', t === 'brush');
+  eraserBtn.classList.toggle('active', t === 'eraser');
+}
+brushBtn.addEventListener('click', () => setTool('brush'));
+eraserBtn.addEventListener('click', () => setTool('eraser'));
+
 let isDown = false;
-// Active local stroke id
 let currentStrokeId: string | null = null;
-// Track remote partial strokes (strokeId -> path state)
-const remoteActive = new Map<string, { strokeId: string; color: string; size: number }>();
-// Maintain previous end point per stroke for validation (avoid automatic line bridging)
-const strokeLastPoint = new Map<string, { x:number; y:number }>();
+let lastPoint: { x: number; y: number } | null = null;
+const localPoints: { x: number; y: number }[] = [];
 
-const getOpts = () => ({ color: colorInput.value, size: Number(sizeInput.value) });
+function genId() { return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8); }
+function size() { return Number(sizeInput.value); }
+function color() { return colorInput.value; }
 
-canvas.addEventListener('pointerdown', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
+function pointerPos(e: PointerEvent) {
+  return { x: e.clientX, y: e.clientY };
+}
+
+hud.addEventListener('pointerdown', (e) => { e.preventDefault(); }); // prevent text selection
+live.addEventListener('pointerdown', (e) => { e.preventDefault(); });
+base.addEventListener('pointerdown', (e) => {
+  const p = pointerPos(e);
   isDown = true;
-  const opts = getOpts();
-  // Always start a brand-new path; ensure we close any current one
-  pad.end();
-  currentStrokeId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
-  pad.begin(x, y, opts);
-  ws.emit('draw:begin', { strokeId: currentStrokeId, x, y, ...opts });
-  strokeLastPoint.set(currentStrokeId, { x, y });
+  currentStrokeId = genId();
+  lastPoint = p;
+  localPoints.length = 0; localPoints.push(p);
+  ws.emit('stroke:begin', { strokeId: currentStrokeId, tool, color: color(), size: size(), x: p.x, y: p.y });
 });
 
-canvas.addEventListener('pointermove', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  ws.emit('cursor', { x, y });
-  if (!isDown) return;
-  // Draw local segment
-  pad.point(x, y);
-  if (currentStrokeId) ws.emit('draw:point', { strokeId: currentStrokeId, x, y });
-  if (currentStrokeId) strokeLastPoint.set(currentStrokeId, { x, y });
+window.addEventListener('pointermove', (e) => {
+  const p = pointerPos(e);
+  ws.emit('cursor', { x: p.x, y: p.y });
+  if (!isDown || !currentStrokeId || !lastPoint) return;
+  // live segment draw
+  layers.drawLiveSegment(tool, color(), size(), lastPoint, p);
+  localPoints.push(p);
+  ws.emit('stroke:point', { strokeId: currentStrokeId, x: p.x, y: p.y });
+  lastPoint = p;
 });
 
-canvas.addEventListener('pointerup', () => {
+window.addEventListener('pointerup', () => {
   if (!isDown) return;
   isDown = false;
-  pad.end(); // close local path
   if (currentStrokeId) {
-    ws.emit('draw:end', { strokeId: currentStrokeId });
+    ws.emit('stroke:end', { strokeId: currentStrokeId });
+    // commit locally (will also arrive via op:commit; we can optimistically apply)
+  // Server will broadcast op:commit. We wait for it to update base canvas.
+    // merge to base by clearing live then drawing final stroke onto base when commit comes
     currentStrokeId = null;
+    lastPoint = null;
+    localPoints.length = 0;
+    layers.clearLive();
   }
 });
 
-clearBtn.addEventListener('click', () => {
-  const ctx = canvas.getContext('2d')!;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+undoBtn.addEventListener('click', () => ws.emit('op:undo'));
+redoBtn.addEventListener('click', () => ws.emit('op:redo'));
+clearBtn.addEventListener('click', () => layers.clearBase());
+
+window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { ws.emit('op:undo'); e.preventDefault(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { ws.emit('op:redo'); e.preventDefault(); }
 });
 
-// Remote events
-ws.on('draw:begin', ({ strokeId, x, y, color, size, userId }) => {
-  if (userId === ws.id()) return; // ignore own echo
-  // Start independent path for remote stroke
-  const ctx = canvas.getContext('2d')!;
-  ctx.beginPath();
-  ctx.strokeStyle = color;
-  ctx.lineWidth = size;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.moveTo(x, y);
-  remoteActive.set(strokeId, { strokeId, color, size });
-  strokeLastPoint.set(strokeId, { x, y });
-});
+// Maintain active remote strokes local reconstruction for smoother live lines
+const remoteLast = new Map<string, { x: number; y: number; tool: 'brush'|'eraser'; color: string; size: number }>();
 
-ws.on('draw:point', ({ strokeId, x, y, userId }) => {
+ws.on('stroke:begin', ({ strokeId, tool, color, size, x, y, userId }) => {
+  if (userId === ws.id()) return; // ignore own
+  remoteLast.set(strokeId, { x, y, tool, color, size });
+});
+ws.on('stroke:point', ({ strokeId, x, y, userId }) => {
   if (userId === ws.id()) return;
-  const entry = remoteActive.get(strokeId); if (!entry) return;
-  const ctx = canvas.getContext('2d')!;
-  const last = strokeLastPoint.get(strokeId);
-  // If last is missing (rare) move then lineTo to avoid bridging from unrelated stroke
-  if (!last) { ctx.moveTo(x, y); }
-  ctx.lineTo(x, y);
-  ctx.stroke();
-  strokeLastPoint.set(strokeId, { x, y });
+  const last = remoteLast.get(strokeId); if (!last) return;
+  layers.drawLiveSegment(last.tool, last.color, last.size, { x: last.x, y: last.y }, { x, y });
+  last.x = x; last.y = y;
 });
-
-ws.on('draw:end', ({ strokeId, userId }) => {
+ws.on('stroke:end', ({ strokeId, userId }) => {
   if (userId === ws.id()) return;
-  if (!remoteActive.has(strokeId)) return;
-  const ctx = canvas.getContext('2d')!;
-  ctx.closePath();
-  remoteActive.delete(strokeId);
-  strokeLastPoint.delete(strokeId);
+  remoteLast.delete(strokeId);
+  // live canvas will be cleared after commit event
 });
 
-// Defensive: ensure no accidental bridging when a remote begin arrives during local draw
-canvas.addEventListener('pointerdown', () => {
-  // If any remote path is halfway rendered and local stroke starts, no need to close those (each has its own path) but ensure the primary pad path ended
-  if (isDown) pad.end();
+// Commit operations update base canvas
+const history: StrokeOp[] = [];
+function redraw() { layers.replay(history); }
+
+ws.on('op:commit', (op) => {
+  history.push(op);
+  redraw();
+  layers.clearLive();
 });
+ws.on('snapshot', (snap) => { history.length = 0; history.push(...snap.history); redraw(); });
+ws.on('state:snapshot', (snap) => { history.length = 0; history.push(...snap.history); redraw(); });
+
+ws.on('user:list', (users: User[]) => {
+  usersSpan.textContent = users.map(u => u.name).join(', ');
+});
+
+ws.on('cursor', (p) => {
+  if (!p.userId) return;
+  layers.setCursor(p.userId, p.x, p.y, p.color || '#333', p.name || 'User');
+});
+
+// Join default room
+ws.emit('user:join', {});
