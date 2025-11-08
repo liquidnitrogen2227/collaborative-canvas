@@ -91,29 +91,55 @@ let isPanning = false;
 let panStart: { x: number; y: number } | null = null;
 let viewAtPanStart: { offsetX: number; offsetY: number; scale: number } | null = null;
 
+// Coalesced drawing & cursor updates for smoother mobile performance
+let pendingCursor: { x: number; y: number } | null = null;
+let pendingStrokePoint: { x: number; y: number } | null = null;
+function flushPoint() {
+  if (pendingCursor) {
+    ws.emit('cursor', { x: pendingCursor.x, y: pendingCursor.y });
+    pendingCursor = null;
+  }
+  if (pendingStrokePoint && currentStrokeId && lastPoint) {
+    const p = pendingStrokePoint;
+    if (tool === 'brush') {
+      layers.drawLiveSegment(tool, color(), size(), lastPoint, p);
+    } else if (tool === 'eraser') {
+      layers.drawBaseSegment(tool, color(), size(), lastPoint, p);
+      incrementalApplied.add(currentStrokeId);
+    } else {
+      layers.setShapePreview(currentStrokeId, tool, color(), size(), localPoints[0], p);
+    }
+    localPoints.push(p);
+    ws.emit('stroke:point', { strokeId: currentStrokeId, x: p.x, y: p.y });
+    lastPoint = p;
+    pendingStrokePoint = null;
+  }
+}
+let flushScheduled = false;
+function scheduleFlush() {
+  if (!flushScheduled) {
+    flushScheduled = true;
+    requestAnimationFrame(() => { flushScheduled = false; flushPoint(); });
+  }
+}
+
 window.addEventListener('pointermove', (e) => {
   const screen = { x: e.clientX, y: e.clientY };
   if (isPanningMode && panStart && viewAtPanStart) {
     const dx = screen.x - panStart.x;
     const dy = screen.y - panStart.y;
     layers.setViewport(viewAtPanStart.scale, viewAtPanStart.offsetX + dx, viewAtPanStart.offsetY + dy);
-    redraw();
+    scheduleFlush(); // minor redraw of HUD
     return;
   }
   const p = pointerPos(e);
-  ws.emit('cursor', { x: p.x, y: p.y });
-  if (!isDown || !currentStrokeId || !lastPoint) return;
-  if (tool === 'brush') {
-    layers.drawLiveSegment(tool, color(), size(), lastPoint, p);
-  } else if (tool === 'eraser') {
-    layers.drawBaseSegment(tool, color(), size(), lastPoint, p);
-    if (currentStrokeId) incrementalApplied.add(currentStrokeId);
+  pendingCursor = p;
+  if (isDown && currentStrokeId) {
+    pendingStrokePoint = p;
+    scheduleFlush();
   } else {
-    layers.setShapePreview(currentStrokeId, tool, color(), size(), localPoints[0], p);
+    scheduleFlush();
   }
-  localPoints.push(p);
-  ws.emit('stroke:point', { strokeId: currentStrokeId, x: p.x, y: p.y });
-  lastPoint = p;
 });
 
 window.addEventListener('pointerup', (e) => {
@@ -187,10 +213,10 @@ window.addEventListener('wheel', (e) => {
     // Pan with wheel
     layers.setViewport(vp.scale, vp.offsetX - e.deltaX, vp.offsetY - e.deltaY);
   }
-  redraw();
+  scheduleRedraw();
 }, { passive: false });
 
-resetViewBtn?.addEventListener('click', () => { layers.setViewport(1, 0, 0); redraw(); });
+resetViewBtn?.addEventListener('click', () => { layers.setViewport(1, 0, 0); scheduleRedraw(); });
 
 // Maintain active remote strokes local reconstruction for smoother live lines
 const remoteLast = new Map<string, { x: number; y: number; tool: 'brush'|'eraser'|'line'|'rect'|'ellipse'; color: string; size: number }>();
@@ -226,6 +252,12 @@ ws.on('stroke:end', ({ strokeId, userId }) => {
 const history: StrokeOp[] = [];
 const incrementalApplied = new Set<string>();
 function redraw() { layers.replay(history); }
+let redrawScheduled = false;
+function scheduleRedraw() {
+  if (redrawScheduled) return;
+  redrawScheduled = true;
+  requestAnimationFrame(() => { redraw(); redrawScheduled = false; });
+}
 
 ws.on('op:commit', (op) => {
   history.push(op);

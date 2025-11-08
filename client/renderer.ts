@@ -50,7 +50,9 @@ export class CanvasLayers {
   private resizeToWindow() {
     const displayW = Math.floor(window.innerWidth);
     const displayH = Math.floor(window.innerHeight);
-    const dpr = Math.max(1, Math.floor((window.devicePixelRatio || 1) * 100) / 100);
+  // Clamp DPR on mobile to reduce memory/overdraw cost
+  const rawDpr = Math.max(1, Math.floor((window.devicePixelRatio || 1) * 100) / 100);
+  const dpr = Math.min(2, rawDpr);
     const dimensionChanged = displayW !== this.width || displayH !== this.height;
     const dprChanged = dpr !== this.dpr;
     if (!dimensionChanged && !dprChanged) return;
@@ -190,11 +192,16 @@ export class CanvasLayers {
   removeCursor(userId: string) { this.cursors.delete(userId); }
 
   private startHudLoop() {
-    const draw = () => {
-      this.clearPixelAligned(this.hudCtx, this.hud);
-      this.applyTransforms();
-      for (const c of this.cursors.values()) this.drawCursor(c);
-      for (const p of this.previews.values()) this.drawPreview(p);
+    let last = 0;
+    const draw = (ts: number) => {
+      // Throttle to ~30 FPS to reduce mobile overdraw
+      if (ts - last > 33) {
+        this.clearPixelAligned(this.hudCtx, this.hud);
+        this.applyTransforms();
+        for (const c of this.cursors.values()) this.drawCursor(c);
+        for (const p of this.previews.values()) this.drawPreview(p);
+        last = ts;
+      }
       this.rafId = requestAnimationFrame(draw);
     };
     this.rafId = requestAnimationFrame(draw);
