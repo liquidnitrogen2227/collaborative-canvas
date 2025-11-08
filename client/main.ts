@@ -83,6 +83,20 @@ base.addEventListener('pointerdown', (e) => {
     // Initiate pinch gesture, abort any stroke
     if (isDown && currentStrokeId) {
       ws.emit('stroke:end', { strokeId: currentStrokeId });
+      // Optimistic local commit for brush to avoid flicker
+      if (tool === 'brush' && localPoints.length) {
+        const op: StrokeOp = {
+          id: currentStrokeId,
+          userId: ws.id() || 'me',
+          tool,
+          color: color(),
+          size: size(),
+          points: [...localPoints],
+          ts: Date.now(),
+        };
+        layers.applyCommittedOp(op);
+        incrementalApplied.add(op.id);
+      }
       currentStrokeId = null; lastPoint = null; localPoints.length = 0;
       layers.clearLive(); layers.clearAllPreviews?.();
       isDown = false;
@@ -216,6 +230,19 @@ window.addEventListener('pointerup', (e) => {
       layers.applyCommittedOp(op);
       incrementalApplied.add(op.id);
       layers.clearAllPreviews?.();
+    } else if (tool === 'brush') {
+      // Optimistic local commit to avoid brief gap before server commit
+      const op: StrokeOp = {
+        id: currentStrokeId,
+        userId: ws.id() || 'me',
+        tool,
+        color: color(),
+        size: size(),
+        points: [...localPoints],
+        ts: Date.now(),
+      };
+      layers.applyCommittedOp(op);
+      incrementalApplied.add(op.id);
     }
     currentStrokeId = null;
     lastPoint = null;
