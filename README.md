@@ -44,8 +44,9 @@ Open two tabs at http://localhost:3000 and draw. You’ll see live strokes and c
 
 ## Infinite canvas & navigation
 
-- Pan: hold Space and drag, or use the mouse wheel (no Ctrl) to scroll/pan.
-- Zoom: Ctrl + mouse wheel; zoom is centered under the pointer. Use the "Reset View" button to return to 100%.
+- Pan (desktop): hold Space and drag, or use the mouse wheel (no Ctrl) to scroll/pan.
+- Zoom (desktop): Ctrl + mouse wheel; zoom is centered under the pointer. Use the "Reset View" button to return to 100%.
+- Pan/Zoom (mobile): two-finger pan and pinch-zoom. Single finger draws. The view keeps the content under your fingers stable while zooming.
 - All strokes are stored in world coordinates and render correctly at any zoom level.
 
 ## Mobile compatibility
@@ -54,12 +55,12 @@ This app includes several mobile-focused improvements:
 
 - Responsive toolbar that wraps on small screens and can be collapsed via a toggle button (appears under ~700px width).
 - High-DPI rendering: canvases allocate device pixels and map CSS pixels through a transform for crisp results on Retina devices.
-- Touch drawing refinements: pointer capture to avoid dropouts, `touch-action: none` to prevent scroll/zoom while drawing, and a guarded `touchmove` handler to stop pull-to-refresh during strokes.
+- Touch drawing refinements: pointer capture to avoid dropouts, `touch-action: none` to prevent scroll/zoom while drawing, and a guarded `touchmove` handler to stop pull-to-refresh during strokes. Two-finger pan and pinch-zoom are supported for the infinite canvas.
 - Orientation changes and resizes preserve content by snapshotting and redrawing after canvas resize.
 
-Future ideas (not yet implemented):
+Future ideas:
 - Optional Wake Lock to keep the screen on while collaborating.
-- Two-finger pan and pinch-zoom for an infinite canvas.
+  
 
 ## Deploy to Render (recommended for realtime)
 

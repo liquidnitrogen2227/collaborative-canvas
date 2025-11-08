@@ -77,6 +77,25 @@ base.addEventListener('pointerdown', (e) => {
     try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch {}
     return;
   }
+  // Track active pointers for gesture detection
+  activePointers.set(e.pointerId, screen);
+  if (activePointers.size === 2) {
+    // Initiate pinch gesture, abort any stroke
+    if (isDown && currentStrokeId) {
+      ws.emit('stroke:end', { strokeId: currentStrokeId });
+      currentStrokeId = null; lastPoint = null; localPoints.length = 0;
+      layers.clearLive(); layers.clearAllPreviews?.();
+      isDown = false;
+    }
+    const pts = Array.from(activePointers.values());
+    const a = pts[0]; const b = pts[1];
+    gestureInitialDistance = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    gestureInitialCenter = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    gestureViewportStart = layers.getViewport();
+    gestureWorldCenterBefore = layers.screenToWorld(gestureInitialCenter);
+    gestureActive = true;
+    return; // don't start drawing
+  }
   const p = pointerPos(e);
   isDown = true;
   currentStrokeId = genId();
@@ -90,6 +109,14 @@ let isPanningMode = false; // toggled by spacebar
 let isPanning = false;
 let panStart: { x: number; y: number } | null = null;
 let viewAtPanStart: { offsetX: number; offsetY: number; scale: number } | null = null;
+
+// Multi-touch gesture state (pinch zoom + two-finger pan)
+const activePointers = new Map<number, { x: number; y: number }>();
+let gestureActive = false;
+let gestureInitialDistance = 0;
+let gestureInitialCenter: { x: number; y: number } | null = null;
+let gestureViewportStart: { scale: number; offsetX: number; offsetY: number } | null = null;
+let gestureWorldCenterBefore: { x: number; y: number } | null = null;
 
 // Coalesced drawing & cursor updates for smoother mobile performance
 let pendingCursor: { x: number; y: number } | null = null;
@@ -125,11 +152,31 @@ function scheduleFlush() {
 
 window.addEventListener('pointermove', (e) => {
   const screen = { x: e.clientX, y: e.clientY };
+  if (activePointers.has(e.pointerId)) activePointers.set(e.pointerId, screen);
+  // Multi-touch pinch / pan
+  if (gestureActive) {
+    if (activePointers.size < 2 || !gestureViewportStart || !gestureInitialCenter || !gestureWorldCenterBefore) {
+      gestureActive = false;
+    } else {
+      const pts = Array.from(activePointers.values());
+      const a = pts[0]; const b = pts[1];
+      const dist = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const center = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const scaleRatio = dist / gestureInitialDistance;
+      const newScale = gestureViewportStart.scale * scaleRatio;
+      const world = gestureWorldCenterBefore;
+      const newOffsetX = center.x - world.x * newScale;
+      const newOffsetY = center.y - world.y * newScale;
+      layers.setViewport(newScale, newOffsetX, newOffsetY);
+      scheduleRedraw();
+      return;
+    }
+  }
   if (isPanningMode && panStart && viewAtPanStart) {
     const dx = screen.x - panStart.x;
     const dy = screen.y - panStart.y;
     layers.setViewport(viewAtPanStart.scale, viewAtPanStart.offsetX + dx, viewAtPanStart.offsetY + dy);
-    scheduleFlush(); // minor redraw of HUD
+    scheduleRedraw();
     return;
   }
   const p = pointerPos(e);
@@ -143,6 +190,14 @@ window.addEventListener('pointermove', (e) => {
 });
 
 window.addEventListener('pointerup', (e) => {
+  // Remove from gesture tracking
+  if (activePointers.has(e.pointerId)) {
+    activePointers.delete(e.pointerId);
+    if (gestureActive && activePointers.size < 2) {
+      gestureActive = false;
+      gestureViewportStart = null; gestureInitialCenter = null; gestureWorldCenterBefore = null;
+    }
+  }
   if (isPanningMode) { panStart = null; viewAtPanStart = null; document.body.classList.remove('panning-active'); }
   if (!isDown) return;
   isDown = false;
@@ -169,6 +224,15 @@ window.addEventListener('pointerup', (e) => {
   }
   // Release pointer capture if applied
   try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+});
+
+// End gesture on cancel
+window.addEventListener('pointercancel', (e) => {
+  if (activePointers.has(e.pointerId)) activePointers.delete(e.pointerId);
+  if (gestureActive && activePointers.size < 2) {
+    gestureActive = false;
+    gestureViewportStart = null; gestureInitialCenter = null; gestureWorldCenterBefore = null;
+  }
 });
 
 // Prevent iOS Safari from triggering pull-to-refresh / scroll during drawing
