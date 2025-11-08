@@ -19,6 +19,13 @@ const ellipseBtn = document.getElementById('tool-ellipse') as HTMLButtonElement;
 const toggleToolbarBtn = document.getElementById('toggle-toolbar') as HTMLButtonElement | null;
 const toolbar = document.getElementById('toolbar') as HTMLDivElement;
 const resetViewBtn = document.getElementById('reset-view') as HTMLButtonElement | null;
+const showUsersBtn = document.getElementById('show-users') as HTMLButtonElement | null;
+const usersPanel = document.getElementById('users-panel') as HTMLDivElement | null;
+const usersCloseBtn = document.getElementById('users-close') as HTMLButtonElement | null;
+const usersList = document.getElementById('users-list') as HTMLUListElement | null;
+const onboardingEl = document.getElementById('onboarding') as HTMLDivElement | null;
+const onboardNameInput = document.getElementById('onboard-name') as HTMLInputElement | null;
+const onboardStartBtn = document.getElementById('onboard-start') as HTMLButtonElement | null;
 
 const layers = new CanvasLayers(base, live, hud);
 const ws = new WSClient();
@@ -31,6 +38,7 @@ function setTool(t: 'brush'|'eraser'|'line'|'rect'|'ellipse') {
   lineBtn.classList.toggle('active', t === 'line');
   rectBtn.classList.toggle('active', t === 'rect');
   ellipseBtn.classList.toggle('active', t === 'ellipse');
+  setStageCursorForTool(tool);
 }
 brushBtn.addEventListener('click', () => setTool('brush'));
 eraserBtn.addEventListener('click', () => setTool('eraser'));
@@ -50,6 +58,11 @@ window.addEventListener('resize', updateToggleVisibility);
 toggleToolbarBtn?.addEventListener('click', () => {
   toolbar.classList.toggle('collapsed');
 });
+
+// Users panel toggle
+function setUsersPanelVisible(v: boolean) { if (!usersPanel) return; usersPanel.style.display = v ? 'block' : 'none'; }
+showUsersBtn?.addEventListener('click', () => setUsersPanelVisible(true));
+usersCloseBtn?.addEventListener('click', () => setUsersPanelVisible(false));
 
 let isDown = false;
 let currentStrokeId: string | null = null;
@@ -137,7 +150,7 @@ let pendingCursor: { x: number; y: number } | null = null;
 let pendingStrokePoint: { x: number; y: number } | null = null;
 function flushPoint() {
   if (pendingCursor) {
-    ws.emit('cursor', { x: pendingCursor.x, y: pendingCursor.y });
+    ws.emit('cursor', { x: pendingCursor.x, y: pendingCursor.y, tool });
     pendingCursor = null;
   }
   if (pendingStrokePoint && currentStrokeId && lastPoint) {
@@ -363,15 +376,82 @@ ws.on('op:commit', (op) => {
 ws.on('snapshot', (snap) => { history.length = 0; history.push(...snap.history); layers.clearAllPreviews?.(); redraw(); });
 ws.on('state:snapshot', (snap) => { history.length = 0; history.push(...snap.history); layers.clearAllPreviews?.(); redraw(); });
 
+// Track users and show toast on join/leave
+let usersInitialized = false;
+let lastUsers = new Map<string, User>();
 ws.on('user:list', (users: User[]) => {
-  usersSpan.textContent = users.map(u => u.name).join(', ');
+  // Update toolbar count
+  usersSpan.textContent = `${users.length} online`;
+  // Update panel list
+  if (usersList) {
+    usersList.innerHTML = '';
+    for (const u of users) {
+      const li = document.createElement('li');
+      li.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${u.color}"></span>${u.name}</span>`;
+      usersList.appendChild(li);
+    }
+  }
+  // Join/leave toasts (skip first list to avoid spam)
+  const current = new Map(users.map(u => [u.id, u] as [string, User]));
+  if (usersInitialized) {
+    for (const [id, u] of current) { if (!lastUsers.has(id)) toast(`${u.name} joined`); }
+    for (const [id, u] of lastUsers) { if (!current.has(id)) toast(`${u.name} left`); }
+  }
+  lastUsers = current;
+  usersInitialized = true;
 });
+
+// Simple toast utility
+function toast(message: string, ms = 2500) {
+  const host = document.getElementById('toasts');
+  if (!host) return;
+  const el = document.createElement('div');
+  el.textContent = message;
+  el.style.cssText = 'background: rgba(0,0,0,0.8); color:#fff; padding:8px 12px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.3); font-size:13px; max-width:70vw;';
+  host.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 200ms'; }, ms);
+  setTimeout(() => { el.remove(); }, ms + 220);
+}
 
 ws.on('cursor', (p) => {
   if (!p.userId) return;
-  // p.x/p.y already world coords
-  layers.setCursor(p.userId, p.x, p.y, p.color || '#333', p.name || 'User');
+  layers.setCursor(p.userId, p.x, p.y, p.color || '#333', p.name || 'User', p.tool as any);
 });
 
 // Join default room
-ws.emit('user:join', {});
+// Defer join until onboarding completed
+function joinWithName(name?: string) {
+  ws.emit('user:join', { name: name && name.trim() ? name.trim() : undefined });
+}
+if (onboardStartBtn && onboardingEl && onboardNameInput) {
+  onboardStartBtn.addEventListener('click', () => {
+    const chosen = onboardNameInput.value.trim() || undefined;
+    joinWithName(chosen);
+    onboardingEl.style.opacity = '0';
+    onboardingEl.style.pointerEvents = 'none';
+    setTimeout(() => onboardingEl.remove(), 400);
+  });
+  // Allow Enter key to submit
+  onboardNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') onboardStartBtn.click();
+  });
+} else {
+  // Fallback (overlay missing) join immediately
+  joinWithName();
+}
+
+// Tool-specific cursor using inline SVG data URIs
+function setStageCursorForTool(t: 'brush'|'eraser'|'line'|'rect'|'ellipse') {
+  const stage = document.getElementById('stage') as HTMLDivElement;
+  if (!stage) return;
+  const svgBrush = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M3 21c1.5 0 2.5-.5 3.5-1.5l6.5-6.5 2 2 4-4-2-2 1.5-1.5c.7-.7.7-1.8 0-2.5s-1.8-.7-2.5 0L10 7.5l-2-2-4 4 2 2L3.5 17.5C2.5 18.5 2 19.5 2 21h1z" fill="#000"/></svg>';
+  const svgEraser = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M16 3l5 5-9 9H7l-4-4L12 3h4z" fill="#ddd" stroke="#000"/><path d="M6 17h6" stroke="#000" stroke-width="2"/></svg>';
+  const svgPlus = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="#000" stroke-width="2" stroke-linecap="round"/></svg>';
+  function makeCursor(svg: string, x: number, y: number) {
+    return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}") ${x} ${y}, auto`;
+  }
+  if (t === 'eraser') stage.style.cursor = makeCursor(svgEraser, 8, 16);
+  else if (t === 'line' || t === 'rect' || t === 'ellipse') stage.style.cursor = makeCursor(svgPlus, 12, 12);
+  else stage.style.cursor = makeCursor(svgBrush, 2, 22);
+}
+setStageCursorForTool(tool);

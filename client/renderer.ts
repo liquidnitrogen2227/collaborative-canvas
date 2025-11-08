@@ -2,7 +2,7 @@ export type Tool = 'brush' | 'eraser' | 'line' | 'rect' | 'ellipse';
 export type Point = { x: number; y: number };
 export type StrokeOp = { id: string; tool: Tool; color: string; size: number; points: Point[] };
 
-type CursorInfo = { x: number; y: number; color: string; name: string };
+type CursorInfo = { x: number; y: number; color: string; name: string; tool?: Tool };
 
 export class CanvasLayers {
   private baseCtx: CanvasRenderingContext2D;
@@ -186,8 +186,8 @@ export class CanvasLayers {
 
   clearAllPreviews() { this.previews.clear(); }
 
-  setCursor(userId: string, x: number, y: number, color: string, name: string) {
-    this.cursors.set(userId, { x, y, color, name });
+  setCursor(userId: string, x: number, y: number, color: string, name: string, tool?: Tool) {
+    this.cursors.set(userId, { x, y, color, name, tool });
   }
   removeCursor(userId: string) { this.cursors.delete(userId); }
 
@@ -219,6 +219,8 @@ export class CanvasLayers {
     ctx.arc(c.x, c.y, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    // Tool icon near cursor
+    this.drawToolIcon(ctx, c);
     ctx.font = '12px sans-serif';
     ctx.fillStyle = '#000';
     ctx.strokeStyle = '#fff';
@@ -226,6 +228,50 @@ export class CanvasLayers {
     const label = c.name;
     ctx.strokeText(label, c.x + 8, c.y - 8);
     ctx.fillText(label, c.x + 8, c.y - 8);
+    ctx.restore();
+  }
+
+  private drawToolIcon(ctx: CanvasRenderingContext2D, c: CursorInfo) {
+    const tool = c.tool || 'brush';
+    ctx.save();
+    ctx.translate(c.x + 10, c.y + 10);
+    ctx.lineWidth = 2;
+    switch (tool) {
+      case 'brush': {
+        // simple pen: diagonal line with nib
+        ctx.strokeStyle = c.color;
+        ctx.beginPath();
+        ctx.moveTo(-6, -6);
+        ctx.lineTo(6, 6);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(2, 6);
+        ctx.lineTo(6, 2);
+        ctx.stroke();
+        break;
+      }
+      case 'eraser': {
+        ctx.fillStyle = '#ddd';
+        ctx.strokeStyle = '#000';
+        ctx.rotate(-0.4);
+        ctx.beginPath();
+        ctx.rect(-6, -4, 12, 8);
+        ctx.fill();
+        ctx.stroke();
+        break;
+      }
+      case 'line':
+      case 'rect':
+      case 'ellipse': {
+        // plus sign
+        ctx.strokeStyle = c.color;
+        ctx.beginPath();
+        ctx.moveTo(-6, 0); ctx.lineTo(6, 0);
+        ctx.moveTo(0, -6); ctx.lineTo(0, 6);
+        ctx.stroke();
+        break;
+      }
+    }
     ctx.restore();
   }
 

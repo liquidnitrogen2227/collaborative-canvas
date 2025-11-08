@@ -1,8 +1,4 @@
-html, body {
-  margin: 0;
-  height: 100%;
-  background: #f4f4f4;
-}
+html, body { margin:0; height:100%; background:#f4f4f4; color:#111; }
 
 #toolbar {
   position: fixed;
@@ -16,6 +12,8 @@ html, body {
   display: flex;
   gap: 8px;
   align-items: center;
+  border: 1px solid rgba(0,0,0,0.1);
+  backdrop-filter: blur(8px);
 }
 
 @media (max-width: 700px) {
@@ -60,7 +58,7 @@ body.panning-active #stage { cursor: grabbing; }
   display: block;
 }
 #stage, #stage canvas { touch-action: none; }
-#base { background: #fff; }
+#base { background:#fff; }
 #live { pointer-events: none; }
 #hud { pointer-events: none; }
 
@@ -77,6 +75,7 @@ body.panning-active #stage { cursor: grabbing; }
 /* Improve tap targets */
 #toolbar button, #toolbar input, #toolbar label {
   min-height: 36px;
+  border-radius: 8px;
 }
 
 /* Allow toolbar to collapse on mobile if desired */

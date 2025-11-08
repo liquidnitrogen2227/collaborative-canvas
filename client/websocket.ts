@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 export type StrokeBegin = { strokeId: string; tool: 'brush'|'eraser'|'line'|'rect'|'ellipse'; color: string; size: number; x: number; y: number };
 export type StrokePoint = { strokeId: string; x: number; y: number };
 export type StrokeEnd = { strokeId: string };
-export type Cursor = { x: number; y: number };
+export type Cursor = { x: number; y: number; tool?: 'brush'|'eraser'|'line'|'rect'|'ellipse' };
 export type StrokeOp = {
   id: string;
   userId: string;
