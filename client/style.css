@@ -15,6 +15,17 @@ html, body {
   color: #2c3e50;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent text selection on mobile */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  /* Prevent callouts on touch and hold */
+  -webkit-touch-callout: none;
+  /* Disable text size adjustment on orientation change */
+  -webkit-text-size-adjust: 100%;
+  /* Smooth scrolling */
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Splash Screen with Rainbow Animation */
@@ -190,6 +201,11 @@ html, body {
   font-family: inherit;
   transition: all 0.3s;
   margin-bottom: 20px;
+  /* Allow text selection in input */
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
 }
 
 #name-input-field:focus {
@@ -342,8 +358,8 @@ html, body {
 /* Site Logo in Top-Left Corner */
 .site-logo {
   position: fixed;
-  top: 20px;
-  left: 20px;
+  top: clamp(12px, 2vw, 20px);
+  left: clamp(12px, 2vw, 20px);
   z-index: 99;
   transition: transform 0.3s;
 }
@@ -355,28 +371,28 @@ html, body {
 
 .site-logo img {
   display: block;
-  width: 72px;
-  height: 72px;
+  width: clamp(48px, 7vw, 72px);
+  height: clamp(48px, 7vw, 72px);
   object-fit: contain;
 }
 
 /* Paint-Style Frosted Glass Toolbar Dock */
 #toolbar {
   position: fixed;
-  top: 16px;
+  top: clamp(8px, 1.5vw, 16px);
   left: 50%;
   transform: translateX(-50%);
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(30px) saturate(180%);
   -webkit-backdrop-filter: blur(30px) saturate(180%);
   border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 16px;
+  border-radius: clamp(10px, 1.5vw, 16px);
   box-shadow: 0 8px 32px rgba(31, 38, 135, 0.2),
               0 2px 8px rgba(0, 0, 0, 0.1),
               inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  padding: 12px 16px;
+  padding: clamp(8px, 1.2vw, 12px) clamp(10px, 1.5vw, 16px);
   display: flex;
-  gap: 16px;
+  gap: clamp(8px, 1.5vw, 16px);
   align-items: flex-start;
   z-index: 100;
   max-width: 95vw;
@@ -392,7 +408,7 @@ html, body {
 .toolbar-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: clamp(4px, 0.6vw, 6px);
   align-items: center;
   min-width: fit-content;
   position: relative;
@@ -400,7 +416,7 @@ html, body {
 }
 
 .section-label {
-  font-size: 11px;
+  font-size: clamp(9px, 1vw, 11px);
   font-weight: 600;
   color: rgba(0, 0, 0, 0.5);
   text-transform: uppercase;
@@ -410,11 +426,11 @@ html, body {
 
 .tool-group {
   display: flex;
-  gap: 6px;
+  gap: clamp(4px, 0.6vw, 6px);
   align-items: center;
   background: rgba(255, 255, 255, 0.5);
-  padding: 6px;
-  border-radius: 10px;
+  padding: clamp(4px, 0.6vw, 6px);
+  border-radius: clamp(8px, 1vw, 10px);
   border: 1px solid rgba(0, 0, 0, 0.06);
   position: relative;
   overflow: visible;
@@ -424,9 +440,9 @@ html, body {
 .tool-btn {
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 8px;
-  width: 40px;
-  height: 40px;
+  border-radius: clamp(6px, 0.8vw, 8px);
+  width: clamp(32px, 4vw, 40px);
+  height: clamp(32px, 4vw, 40px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -434,6 +450,12 @@ html, body {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   color: #2c3e50;
   position: relative;
+  /* Better touch targets */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  /* Minimum touch target size */
+  min-width: clamp(32px, 4vw, 40px);
+  min-height: clamp(32px, 4vw, 40px);
 }
 
 .tool-btn:hover {
@@ -455,19 +477,19 @@ html, body {
 }
 
 .tool-btn svg {
-  width: 20px;
-  height: 20px;
+  width: clamp(16px, 2vw, 20px);
+  height: clamp(16px, 2vw, 20px);
 }
 
 /* Shapes Dropdown Button */
 .shapes-btn {
   width: auto;
-  padding: 0 12px;
-  gap: 6px;
+  padding: 0 clamp(10px, 1.2vw, 12px);
+  gap: clamp(4px, 0.6vw, 6px);
 }
 
 .dropdown-arrow {
-  font-size: 10px;
+  font-size: clamp(8px, 1vw, 10px);
   transition: transform 0.2s;
 }
 
@@ -544,8 +566,8 @@ html, body {
 
 /* Size Slider */
 .size-slider {
-  width: 100px;
-  height: 4px;
+  width: clamp(80px, 10vw, 100px);
+  height: clamp(3px, 0.4vw, 4px);
   background: linear-gradient(90deg, rgba(0, 122, 255, 0.3), rgba(0, 122, 255, 0.7));
   border-radius: 2px;
   outline: none;
@@ -557,8 +579,8 @@ html, body {
 .size-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: clamp(14px, 1.6vw, 16px);
+  height: clamp(14px, 1.6vw, 16px);
   background: white;
   border: 2px solid #007AFF;
   border-radius: 50%;
@@ -573,8 +595,8 @@ html, body {
 }
 
 .size-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: clamp(14px, 1.6vw, 16px);
+  height: clamp(14px, 1.6vw, 16px);
   background: white;
   border: 2px solid #007AFF;
   border-radius: 50%;
@@ -583,19 +605,19 @@ html, body {
 }
 
 .size-value {
-  font-size: 12px;
+  font-size: clamp(10px, 1.2vw, 12px);
   font-weight: 600;
   color: #2c3e50;
-  min-width: 32px;
+  min-width: clamp(28px, 3.5vw, 32px);
   text-align: center;
 }
 
 /* Color Picker */
 .color-picker {
-  width: 40px;
-  height: 40px;
+  width: clamp(32px, 4vw, 40px);
+  height: clamp(32px, 4vw, 40px);
   border: 2px solid rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+  border-radius: clamp(6px, 0.8vw, 8px);
   cursor: pointer;
   transition: all 0.2s;
   background: white;
@@ -609,18 +631,18 @@ html, body {
 /* Users Button */
 .users-btn {
   width: auto;
-  padding: 0 12px;
-  gap: 8px;
+  padding: 0 clamp(10px, 1.2vw, 12px);
+  gap: clamp(6px, 0.8vw, 8px);
 }
 
 .user-count {
   background: #007AFF;
   color: white;
-  font-size: 11px;
+  font-size: clamp(9px, 1.1vw, 11px);
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 10px;
-  min-width: 20px;
+  padding: clamp(1px, 0.2vw, 2px) clamp(4px, 0.6vw, 6px);
+  border-radius: clamp(8px, 1vw, 10px);
+  min-width: clamp(18px, 2vw, 20px);
   text-align: center;
 }
 
@@ -823,6 +845,7 @@ body.panning-active #stage {
 
 /* Responsive */
 @media (max-width: 768px) {
+  /* Make toolbar scrollable horizontally on tablets */
   #toolbar {
     left: 10px;
     right: 10px;
@@ -830,31 +853,69 @@ body.panning-active #stage {
     gap: 12px;
     padding: 10px 12px;
     overflow-x: auto;
+    overflow-y: visible;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  
+  #toolbar::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
   }
   
   .section-label {
     font-size: 10px;
+    white-space: nowrap;
   }
   
   .tool-btn {
     width: 36px;
     height: 36px;
+    flex-shrink: 0;
   }
   
   .size-slider {
     width: 80px;
   }
+  
+  /* Make logo smaller on tablets */
+  .site-logo {
+    top: 12px;
+    left: 12px;
+  }
+  
+  .site-logo img {
+    width: 56px;
+    height: 56px;
+  }
+  
+  /* Adjust users panel for tablets */
+  #users-panel {
+    width: 280px;
+    max-width: 80vw;
+  }
 }
 
 @media (max-width: 480px) {
+  /* Optimize toolbar for mobile phones */
   #toolbar {
+    top: max(10px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
     gap: 8px;
-    padding: 8px;
+    padding: 8px 10px;
+    border-radius: 12px;
+  }
+  
+  .toolbar-section {
+    min-width: fit-content;
+    gap: 6px;
   }
   
   .tool-btn {
     width: 32px;
     height: 32px;
+    min-width: 32px;
+    flex-shrink: 0;
   }
   
   .tool-btn svg {
@@ -864,5 +925,84 @@ body.panning-active #stage {
   
   .section-label {
     font-size: 9px;
+    white-space: nowrap;
+  }
+  
+  .size-slider {
+    width: 60px;
+    height: 4px;
+  }
+  
+  .size-display {
+    font-size: 10px;
+  }
+  
+  /* Make logo much smaller on mobile */
+  .site-logo {
+    top: max(8px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+  }
+  
+  .site-logo img {
+    width: 40px;
+    height: 40px;
+  }
+  
+  /* Optimize users panel for mobile */
+  #users-panel {
+    width: 100%;
+    max-width: 100vw;
+    height: 50vh;
+    border-radius: 16px 16px 0 0;
+    bottom: 0;
+    top: auto;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+  
+  /* Optimize tutorial for mobile */
+  .tutorial-bubble {
+    width: 90vw;
+    max-width: 90vw;
+    padding: 16px;
+    font-size: 14px;
+  }
+  
+  .tutorial-bubble h3 {
+    font-size: 18px;
+  }
+  
+  .tutorial-bubble p {
+    font-size: 13px;
+  }
+  
+  .tutorial-pointer {
+    display: none; /* Hide pointers on mobile as they might not align well */
+  }
+  
+  /* Optimize splash screen for mobile */
+  .app-logo {
+    max-width: 250px;
+    max-height: 250px;
+  }
+  
+  .name-input-container {
+    width: 90%;
+    max-width: 90%;
+    padding: 24px;
+  }
+  
+  .name-input-container h1 {
+    font-size: 28px;
+  }
+  
+  #name-input-field {
+    font-size: 16px; /* Prevents zoom on iOS */
+    padding: 12px 16px;
+  }
+  
+  /* Better touch targets for mobile buttons */
+  button {
+    min-height: 44px; /* Apple's recommended minimum touch target */
+    -webkit-tap-highlight-color: transparent;
   }
 }
