@@ -92,6 +92,11 @@ io.on('connection', (socket) => {
     socket.to(roomId).emit('cursor', { userId: socket.id, name: me?.name, color: me?.color, ...p });
   });
 
+  // Ping/pong for latency measurement
+  socket.on('ping', () => {
+    socket.emit('pong');
+  });
+
   socket.on('disconnect', () => {
     rooms.removeUser(roomId, socket.id);
     broadcastUsers();

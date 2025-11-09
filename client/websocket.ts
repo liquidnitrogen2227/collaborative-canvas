@@ -18,12 +18,32 @@ export type User = { id: string; name: string; color: string };
 
 export class WSClient {
   private socket: Socket;
+  private lastPingTime = 0;
+  private latency = 0;
 
   constructor() {
-    this.socket = io();
+    this.socket = io({
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity,
+    });
+    this.setupPingPong();
   }
 
   id(): string | undefined { return (this.socket as any).id; }
+  getLatency(): number { return this.latency; }
+
+  private setupPingPong() {
+    setInterval(() => {
+      this.lastPingTime = Date.now();
+      this.socket.emit('ping');
+    }, 2000);
+
+    this.socket.on('pong', () => {
+      this.latency = Date.now() - this.lastPingTime;
+    });
+  }
 
   on(event: 'stroke:begin', cb: (p: StrokeBegin & { userId: string }) => void): void;
   on(event: 'stroke:point', cb: (p: StrokePoint & { userId: string }) => void): void;
@@ -33,6 +53,9 @@ export class WSClient {
   on(event: 'snapshot', cb: (p: Snapshot) => void): void;
   on(event: 'state:snapshot', cb: (p: Snapshot) => void): void;
   on(event: 'user:list', cb: (p: User[]) => void): void;
+  on(event: 'connect', cb: () => void): void;
+  on(event: 'disconnect', cb: (reason: string) => void): void;
+  on(event: 'connect_error', cb: (error: Error) => void): void;
   on(event: string, cb: (p: any) => void) { this.socket.on(event, cb); }
 
   emit(event: 'stroke:begin', p: StrokeBegin): void;

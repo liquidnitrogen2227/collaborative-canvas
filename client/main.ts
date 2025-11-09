@@ -34,9 +34,46 @@ const usersList = document.getElementById('users-list') as HTMLUListElement | nu
 const onboardingEl = document.getElementById('onboarding') as HTMLDivElement | null;
 const onboardNameInput = document.getElementById('onboard-name') as HTMLInputElement | null;
 const onboardStartBtn = document.getElementById('onboard-start') as HTMLButtonElement | null;
+const leaveSessionBtn = document.getElementById('leave-session') as HTMLButtonElement | null;
 
 const layers = new CanvasLayers(base, live, hud);
 const ws = new WSClient();
+
+// Stats display elements
+const fpsValueEl = document.getElementById('fps-value') as HTMLSpanElement;
+const latencyValueEl = document.getElementById('latency-value') as HTMLSpanElement;
+const connectionStatusEl = document.getElementById('connection-status') as HTMLDivElement;
+
+// FPS tracking
+let frameCount = 0;
+let lastFpsUpdate = Date.now();
+function updateFPS() {
+  frameCount++;
+  const now = Date.now();
+  if (now - lastFpsUpdate >= 1000) {
+    const fps = Math.round(frameCount * 1000 / (now - lastFpsUpdate));
+    fpsValueEl.textContent = fps.toString();
+    frameCount = 0;
+    lastFpsUpdate = now;
+  }
+  requestAnimationFrame(updateFPS);
+}
+updateFPS();
+
+// Latency tracking
+setInterval(() => {
+  const latency = ws.getLatency();
+  latencyValueEl.textContent = `${latency}ms`;
+  
+  // Color code latency
+  if (latency < 50) {
+    latencyValueEl.style.color = '#4caf50'; // Green
+  } else if (latency < 100) {
+    latencyValueEl.style.color = '#ffa726'; // Orange
+  } else {
+    latencyValueEl.style.color = '#ff5252'; // Red
+  }
+}, 1000);
 
 // Tutorial elements
 const tutorialOverlay = document.getElementById('tutorial-overlay') as HTMLDivElement;
@@ -52,6 +89,12 @@ let currentTutorialStep = 0;
 // Hide old onboarding initially
 if (onboardingEl) onboardingEl.style.display = 'none';
 
+// Check if user has already set their name
+const savedName = localStorage.getItem('userName');
+const tutorialCompleted = localStorage.getItem('tutorialCompleted') === 'true';
+
+console.log('[Onboarding] Checking localStorage:', { savedName, tutorialCompleted });
+
 // Handle splash screen and name input
 // Check if logo exists, otherwise use placeholder
 appLogo.onerror = () => {
@@ -63,17 +106,43 @@ appLogo.onload = () => {
   placeholderLogo.style.display = 'none';
 };
 
-// Show name input behind splash screen, then transition
-nameInputScreen.style.display = 'flex';
-
-// After splash animation (2 seconds), fade out splash to reveal name input
-setTimeout(() => {
-  splashScreen.style.animation = 'fadeOut 0.5s ease-out forwards';
+if (savedName) {
+  console.log('[Onboarding] Returning user detected, skipping onboarding');
+  // User has been here before - skip splash and name input
+  splashScreen.style.display = 'none';
+  nameInputScreen.style.display = 'none';
+  
+  // Set the saved name for connection
+  if (onboardNameInput) onboardNameInput.value = savedName;
+  
+  // Auto-join after a brief moment
   setTimeout(() => {
-    splashScreen.style.display = 'none';
-    nameInputField.focus();
-  }, 500);
-}, 2000);
+    console.log('[Onboarding] Auto-joining with saved name:', savedName);
+    if (onboardStartBtn) onboardStartBtn.click();
+  }, 300);
+  
+  // Show tutorial only if they haven't completed it
+  if (!tutorialCompleted) {
+    console.log('[Onboarding] Showing tutorial (not completed yet)');
+    setTimeout(() => startTutorial(), 500);
+  } else {
+    console.log('[Onboarding] Skipping tutorial (already completed)');
+  }
+} else {
+  console.log('[Onboarding] First-time user, showing full onboarding flow');
+  // First-time user - show splash and name input flow
+  // Show name input behind splash screen, then transition
+  nameInputScreen.style.display = 'flex';
+
+  // After splash animation (2 seconds), fade out splash to reveal name input
+  setTimeout(() => {
+    splashScreen.style.animation = 'fadeOut 0.5s ease-out forwards';
+    setTimeout(() => {
+      splashScreen.style.display = 'none';
+      nameInputField.focus();
+    }, 500);
+  }, 2000);
+}
 
 // Handle name input submission
 function startApp() {
@@ -83,8 +152,11 @@ function startApp() {
     return;
   }
   
-  // Store name and hide name input screen
+  // Store name in localStorage for future visits
   localStorage.setItem('userName', name);
+  console.log('[Onboarding] Saved name to localStorage:', name);
+  
+  // Hide name input screen
   nameInputScreen.style.animation = 'fadeOut 0.3s ease-out forwards';
   setTimeout(() => {
     nameInputScreen.style.display = 'none';
@@ -94,11 +166,6 @@ function startApp() {
   
   // Set the name for the websocket connection
   if (onboardNameInput) onboardNameInput.value = name;
-  
-  // Connect to websocket (don't auto-click start, tutorial will handle it)
-  setTimeout(() => {
-    if (onboardStartBtn) onboardStartBtn.click();
-  }, 500);
 }
 
 startBtn.addEventListener('click', startApp);
@@ -111,18 +178,22 @@ function startTutorial() {
   tutorialOverlay.style.display = 'block';
   showTutorialStep(0);
   
-  // Add next button listeners
+  // Add next button listeners (only add once)
   tutorialSteps.forEach((step, index) => {
     const nextBtn = step.querySelector('.tutorial-next') as HTMLButtonElement;
-    if (nextBtn) {
+    if (nextBtn && !nextBtn.hasAttribute('data-listener-added')) {
+      nextBtn.setAttribute('data-listener-added', 'true');
       nextBtn.addEventListener('click', () => {
         if (index < tutorialSteps.length - 1) {
           showTutorialStep(index + 1);
         } else {
-          // End tutorial
+          // End tutorial and mark as completed
+          localStorage.setItem('tutorialCompleted', 'true');
           tutorialOverlay.style.animation = 'fadeOut 0.3s ease-out forwards';
           setTimeout(() => {
             tutorialOverlay.style.display = 'none';
+            // Connect to the canvas after tutorial
+            if (onboardStartBtn) onboardStartBtn.click();
           }, 300);
         }
       });
@@ -434,6 +505,18 @@ undoBtn.addEventListener('click', () => ws.emit('op:undo'));
 redoBtn.addEventListener('click', () => ws.emit('op:redo'));
 clearAllBtn.addEventListener('click', () => ws.emit('op:clear'));
 
+// Leave session button - clears localStorage and reloads page
+leaveSessionBtn?.addEventListener('click', () => {
+  if (confirm('Leave this session? Your name and progress will be forgotten.')) {
+    console.log('[Leave Session] Clearing localStorage and reloading...');
+    localStorage.clear();
+    toast('👋 Leaving session...', 1500);
+    setTimeout(() => {
+      window.location.reload();
+    }, 1500);
+  }
+});
+
 window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { ws.emit('op:undo'); e.preventDefault(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { ws.emit('op:redo'); e.preventDefault(); }
@@ -560,11 +643,79 @@ ws.on('cursor', (p) => {
   layers.setCursor(p.userId, p.x, p.y, p.color || '#333', p.name || 'User', p.tool as any);
 });
 
+// Reconnection handling
+let isConnected = true;
+let userName = '';
+let userColor = '';
+
+ws.on('disconnect', (reason) => {
+  isConnected = false;
+  connectionStatusEl.classList.remove('connected');
+  connectionStatusEl.classList.add('disconnected');
+  
+  console.warn('WebSocket disconnected:', reason);
+  
+  if (reason === 'io server disconnect') {
+    // Server initiated disconnect, manually reconnect
+    toast('⚠️ Connection lost - reconnecting...', 3000);
+  } else {
+    // Client disconnected, Socket.io will auto-reconnect
+    toast('⚠️ Connection lost - attempting to reconnect...', 3000);
+  }
+});
+
+ws.on('connect', () => {
+  const wasDisconnected = !isConnected;
+  isConnected = true;
+  connectionStatusEl.classList.remove('disconnected', 'reconnecting');
+  connectionStatusEl.classList.add('connected');
+  
+  if (wasDisconnected) {
+    console.log('WebSocket reconnected');
+    toast('✅ Reconnected!', 2000);
+    
+    // Re-join room with saved credentials
+    if (userName) {
+      ws.emit('user:join', { name: userName, color: userColor });
+    }
+  }
+});
+
+ws.on('connect_error', (error) => {
+  connectionStatusEl.classList.remove('connected', 'disconnected');
+  connectionStatusEl.classList.add('reconnecting');
+  console.error('Connection error:', error);
+});
+
+// Save user credentials for reconnection
+function saveUserCredentials(name: string, color: string) {
+  userName = name;
+  userColor = color;
+}
+
 // Join default room
 // Defer join until onboarding completed
 function joinWithName(name?: string) {
-  ws.emit('user:join', { name: name && name.trim() ? name.trim() : undefined });
+  const finalName = name && name.trim() ? name.trim() : 'Anonymous';
+  ws.emit('user:join', { name: finalName });
+  // Note: Server assigns color, we'll capture it from the user:list event
+  saveUserCredentials(finalName, '#333'); // Temp color until we get real one
 }
+
+// Update saved credentials when we get user list (captures server-assigned color)
+let hasCapturedColor = false;
+const originalUserListHandler = ws.on.bind(ws);
+ws.on('user:list', (users: User[]) => {
+  // Capture our own color on first user list
+  if (!hasCapturedColor && ws.id()) {
+    const me = users.find(u => u.id === ws.id());
+    if (me) {
+      saveUserCredentials(me.name, me.color);
+      hasCapturedColor = true;
+    }
+  }
+});
+
 if (onboardStartBtn && onboardingEl && onboardNameInput) {
   onboardStartBtn.addEventListener('click', () => {
     const chosen = onboardNameInput.value.trim() || undefined;

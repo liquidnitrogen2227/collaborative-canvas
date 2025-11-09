@@ -376,6 +376,81 @@ html, body {
   object-fit: contain;
 }
 
+/* FPS and Latency Display (Top-Right) */
+.stats-display {
+  position: fixed;
+  top: clamp(12px, 2vw, 20px);
+  right: clamp(12px, 2vw, 20px);
+  z-index: 99;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: clamp(10px, 1.5vw, 12px);
+  box-shadow: 0 4px 16px rgba(31, 38, 135, 0.2),
+              0 2px 8px rgba(0, 0, 0, 0.1),
+              inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  padding: clamp(8px, 1vw, 10px) clamp(12px, 1.5vw, 14px);
+  display: flex;
+  gap: clamp(12px, 1.5vw, 16px);
+  align-items: center;
+  font-family: 'Inter', monospace;
+  font-size: clamp(10px, 1.1vw, 11px);
+  user-select: none;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.stat-label {
+  font-size: clamp(8px, 0.9vw, 9px);
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: clamp(11px, 1.3vw, 13px);
+  font-weight: 700;
+  color: #2c3e50;
+  font-variant-numeric: tabular-nums;
+}
+
+.connection-status {
+  width: clamp(8px, 1vw, 10px);
+  height: clamp(8px, 1vw, 10px);
+  border-radius: 50%;
+  margin-left: clamp(4px, 0.5vw, 6px);
+  transition: background-color 0.3s;
+}
+
+.connection-status.connected {
+  background-color: #4caf50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
+}
+
+.connection-status.disconnected {
+  background-color: #ff5252;
+  box-shadow: 0 0 8px rgba(255, 82, 82, 0.6);
+  animation: pulse 1s infinite;
+}
+
+.connection-status.reconnecting {
+  background-color: #ffa726;
+  box-shadow: 0 0 8px rgba(255, 167, 38, 0.6);
+  animation: pulse 0.8s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
 /* Paint-Style Frosted Glass Toolbar Dock */
 #toolbar {
   position: fixed;
@@ -893,6 +968,14 @@ body.panning-active #stage {
     width: 280px;
     max-width: 80vw;
   }
+  
+  /* Adjust stats display on tablets */
+  .stats-display {
+    top: 12px;
+    right: 12px;
+    padding: 8px 10px;
+    gap: 10px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -977,6 +1060,28 @@ body.panning-active #stage {
   
   .tutorial-pointer {
     display: none; /* Hide pointers on mobile as they might not align well */
+  }
+  
+  /* Make stats display compact on mobile */
+  .stats-display {
+    top: max(8px, env(safe-area-inset-top));
+    right: max(8px, env(safe-area-inset-right));
+    padding: 6px 8px;
+    gap: 8px;
+    font-size: 9px;
+  }
+  
+  .stat-label {
+    font-size: 7px;
+  }
+  
+  .stat-value {
+    font-size: 10px;
+  }
+  
+  .connection-status {
+    width: 6px;
+    height: 6px;
   }
   
   /* Optimize splash screen for mobile */
