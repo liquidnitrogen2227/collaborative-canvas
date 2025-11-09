@@ -149,24 +149,6 @@ npm start      # Build and run production server
 - User authentication
 - Wake Lock API
 
-## Deploy to Render
-
-1. Fork this repository
-2. Create a Web Service on Render
-   - Build: `npm run build`
-   - Start: `node dist/server/server.js`
-   - Health Check: `/healthz`
-3. Deploy (auto-detects `render.yaml`)
-
-Free tier spins down after inactivity (~30s wake time).
-
-## License
-
-MIT - use however you'd like!
-
-## Contributing
-
-Issues and PRs welcome!
 
 ---
 
@@ -174,4 +156,4 @@ Built with vanilla TypeScript and Socket.io
 
 ---
 
-Built with vanilla TypeScript + Socket.io 🎨
+Built with vanilla TypeScript + Socket.io
