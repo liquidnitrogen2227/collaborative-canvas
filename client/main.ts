@@ -1,23 +1,31 @@
 import { WSClient, StrokeOp, User } from './websocket.ts';
 import { CanvasLayers } from './renderer.ts';
 
+// Splash screen and name input elements
+const splashScreen = document.getElementById('splash-screen') as HTMLDivElement;
+const nameInputScreen = document.getElementById('name-input-screen') as HTMLDivElement;
+const nameInputField = document.getElementById('name-input-field') as HTMLInputElement;
+const startBtn = document.getElementById('start-btn') as HTMLButtonElement;
+const appLogo = document.getElementById('app-logo') as HTMLImageElement;
+const placeholderLogo = document.getElementById('placeholder-logo') as HTMLDivElement;
+
 const base = document.getElementById('base') as HTMLCanvasElement;
 const live = document.getElementById('live') as HTMLCanvasElement;
 const hud = document.getElementById('hud') as HTMLCanvasElement;
 const sizeInput = document.getElementById('size') as HTMLInputElement;
+const sizeDisplay = document.getElementById('size-display') as HTMLSpanElement;
 const colorInput = document.getElementById('color') as HTMLInputElement;
 const undoBtn = document.getElementById('undo') as HTMLButtonElement;
 const redoBtn = document.getElementById('redo') as HTMLButtonElement;
-const clearBtn = document.getElementById('clear') as HTMLButtonElement;
-const clearGlobalBtn = document.getElementById('clear-global') as HTMLButtonElement;
-const usersSpan = document.getElementById('users') as HTMLSpanElement;
+const clearAllBtn = document.getElementById('clear-all') as HTMLButtonElement;
+const usersCount = document.getElementById('users-count') as HTMLSpanElement;
 const brushBtn = document.getElementById('tool-brush') as HTMLButtonElement;
 const eraserBtn = document.getElementById('tool-eraser') as HTMLButtonElement;
 const lineBtn = document.getElementById('tool-line') as HTMLButtonElement;
 const rectBtn = document.getElementById('tool-rect') as HTMLButtonElement;
 const ellipseBtn = document.getElementById('tool-ellipse') as HTMLButtonElement;
-const toggleToolbarBtn = document.getElementById('toggle-toolbar') as HTMLButtonElement | null;
-const toolbar = document.getElementById('toolbar') as HTMLDivElement;
+const shapesToggle = document.getElementById('shapes-toggle') as HTMLButtonElement;
+const shapesMenu = document.getElementById('shapes-menu') as HTMLDivElement;
 const resetViewBtn = document.getElementById('reset-view') as HTMLButtonElement | null;
 const showUsersBtn = document.getElementById('show-users') as HTMLButtonElement | null;
 const usersPanel = document.getElementById('users-panel') as HTMLDivElement | null;
@@ -29,6 +37,149 @@ const onboardStartBtn = document.getElementById('onboard-start') as HTMLButtonEl
 
 const layers = new CanvasLayers(base, live, hud);
 const ws = new WSClient();
+
+// Tutorial elements
+const tutorialOverlay = document.getElementById('tutorial-overlay') as HTMLDivElement;
+const tutorialSteps = [
+  document.getElementById('tutorial-step-1') as HTMLDivElement,
+  document.getElementById('tutorial-step-2') as HTMLDivElement,
+  document.getElementById('tutorial-step-3') as HTMLDivElement,
+  document.getElementById('tutorial-step-4') as HTMLDivElement,
+  document.getElementById('tutorial-step-5') as HTMLDivElement,
+];
+let currentTutorialStep = 0;
+
+// Hide old onboarding initially
+if (onboardingEl) onboardingEl.style.display = 'none';
+
+// Handle splash screen and name input
+// Check if logo exists, otherwise use placeholder
+appLogo.onerror = () => {
+  appLogo.style.display = 'none';
+  placeholderLogo.style.display = 'block';
+};
+appLogo.onload = () => {
+  appLogo.style.display = 'block';
+  placeholderLogo.style.display = 'none';
+};
+
+// Show name input behind splash screen, then transition
+nameInputScreen.style.display = 'flex';
+
+// After splash animation (2 seconds), fade out splash to reveal name input
+setTimeout(() => {
+  splashScreen.style.animation = 'fadeOut 0.5s ease-out forwards';
+  setTimeout(() => {
+    splashScreen.style.display = 'none';
+    nameInputField.focus();
+  }, 500);
+}, 2000);
+
+// Handle name input submission
+function startApp() {
+  const name = nameInputField.value.trim();
+  if (!name) {
+    nameInputField.style.borderColor = '#ff4444';
+    return;
+  }
+  
+  // Store name and hide name input screen
+  localStorage.setItem('userName', name);
+  nameInputScreen.style.animation = 'fadeOut 0.3s ease-out forwards';
+  setTimeout(() => {
+    nameInputScreen.style.display = 'none';
+    // Start tutorial
+    startTutorial();
+  }, 300);
+  
+  // Set the name for the websocket connection
+  if (onboardNameInput) onboardNameInput.value = name;
+  
+  // Connect to websocket (don't auto-click start, tutorial will handle it)
+  setTimeout(() => {
+    if (onboardStartBtn) onboardStartBtn.click();
+  }, 500);
+}
+
+startBtn.addEventListener('click', startApp);
+nameInputField.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') startApp();
+});
+
+// Tutorial system
+function startTutorial() {
+  tutorialOverlay.style.display = 'block';
+  showTutorialStep(0);
+  
+  // Add next button listeners
+  tutorialSteps.forEach((step, index) => {
+    const nextBtn = step.querySelector('.tutorial-next') as HTMLButtonElement;
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        if (index < tutorialSteps.length - 1) {
+          showTutorialStep(index + 1);
+        } else {
+          // End tutorial
+          tutorialOverlay.style.animation = 'fadeOut 0.3s ease-out forwards';
+          setTimeout(() => {
+            tutorialOverlay.style.display = 'none';
+          }, 300);
+        }
+      });
+    }
+  });
+}
+
+function showTutorialStep(stepIndex: number) {
+  // Hide all steps
+  tutorialSteps.forEach(step => step.style.display = 'none');
+  // Show current step
+  if (tutorialSteps[stepIndex]) {
+    tutorialSteps[stepIndex].style.display = 'block';
+  }
+  currentTutorialStep = stepIndex;
+}
+
+// Add fadeOut animation
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes fadeOut {
+    to {
+      opacity: 0;
+      pointer-events: none;
+    }
+  }
+`;
+document.head.appendChild(style);
+
+// Update size display
+sizeInput.addEventListener('input', () => {
+  sizeDisplay.textContent = `${sizeInput.value}px`;
+});
+
+// Shapes dropdown toggle
+shapesToggle.addEventListener('click', (e) => {
+  e.stopPropagation();
+  shapesMenu.classList.toggle('show');
+  shapesToggle.classList.toggle('active');
+  
+  // Position dropdown below the button
+  if (shapesMenu.classList.contains('show')) {
+    const rect = shapesToggle.getBoundingClientRect();
+    shapesMenu.style.top = `${rect.bottom + 8}px`;
+    shapesMenu.style.left = `${rect.left}px`;
+  }
+});
+
+// Close shapes menu when clicking outside
+document.addEventListener('click', () => {
+  shapesMenu.classList.remove('show');
+  shapesToggle.classList.remove('active');
+});
+
+shapesMenu.addEventListener('click', (e) => {
+  e.stopPropagation();
+});
 
 let tool: 'brush' | 'eraser' | 'line' | 'rect' | 'ellipse' = 'brush';
 function setTool(t: 'brush'|'eraser'|'line'|'rect'|'ellipse') {
@@ -45,19 +196,6 @@ eraserBtn.addEventListener('click', () => setTool('eraser'));
 lineBtn.addEventListener('click', () => setTool('line'));
 rectBtn.addEventListener('click', () => setTool('rect'));
 ellipseBtn.addEventListener('click', () => setTool('ellipse'));
-
-// Show toggle button on small screens
-function updateToggleVisibility() {
-  if (!toggleToolbarBtn) return;
-  const show = window.innerWidth < 700;
-  toggleToolbarBtn.style.display = show ? 'inline-block' : 'none';
-  if (!show) toolbar.classList.remove('collapsed');
-}
-updateToggleVisibility();
-window.addEventListener('resize', updateToggleVisibility);
-toggleToolbarBtn?.addEventListener('click', () => {
-  toolbar.classList.toggle('collapsed');
-});
 
 // Users panel toggle
 function setUsersPanelVisible(v: boolean) { if (!usersPanel) return; usersPanel.style.display = v ? 'block' : 'none'; }
@@ -229,6 +367,11 @@ window.addEventListener('pointerup', (e) => {
   if (!isDown) return;
   isDown = false;
   if (currentStrokeId) {
+    // For single-click dots: duplicate the point if we only have one
+    if (localPoints.length === 1) {
+      localPoints.push({ ...localPoints[0] });
+    }
+    
     ws.emit('stroke:end', { strokeId: currentStrokeId });
     if (tool === 'line' || tool === 'rect' || tool === 'ellipse') {
       const op: StrokeOp = {
@@ -289,8 +432,7 @@ window.addEventListener('orientationchange', () => {
 
 undoBtn.addEventListener('click', () => ws.emit('op:undo'));
 redoBtn.addEventListener('click', () => ws.emit('op:redo'));
-clearBtn.addEventListener('click', () => { layers.clearBase(); layers.clearLive(); layers.clearAllPreviews?.(); });
-clearGlobalBtn.addEventListener('click', () => ws.emit('op:clear'));
+clearAllBtn.addEventListener('click', () => ws.emit('op:clear'));
 
 window.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { ws.emit('op:undo'); e.preventDefault(); }
@@ -380,8 +522,8 @@ ws.on('state:snapshot', (snap) => { history.length = 0; history.push(...snap.his
 let usersInitialized = false;
 let lastUsers = new Map<string, User>();
 ws.on('user:list', (users: User[]) => {
-  // Update toolbar count
-  usersSpan.textContent = `${users.length} online`;
+  // Update toolbar count badge
+  usersCount.textContent = `${users.length}`;
   // Update panel list
   if (usersList) {
     usersList.innerHTML = '';

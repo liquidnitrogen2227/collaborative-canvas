@@ -12,6 +12,10 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
 app.disable('x-powered-by');
 
+// Serve static files from public folder (for logo, etc.)
+const publicDir = path.join(process.cwd(), 'public');
+app.use(express.static(publicDir));
+
 // Serve static client
 const clientDir = path.join(process.cwd(), 'client');
 app.use(express.static(clientDir));

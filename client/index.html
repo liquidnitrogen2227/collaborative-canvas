@@ -4,10 +4,101 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Collaborative Canvas</title>
+    <link rel="icon" type="image/png" href="/logo.png" />
   <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-  <div id="onboarding" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);color:#fff;z-index:1000;font-family:sans-serif;padding:24px;">
+  
+  <!-- Splash Screen with Rainbow Animation -->
+  <div id="splash-screen" class="splash-screen">
+    <div class="rainbow-wave"></div>
+    <div class="logo-container">
+      <!-- Replace this with your actual logo image -->
+      <img id="app-logo" src="/logo.png" alt="Logo" class="app-logo">
+      <!-- Fallback placeholder logo -->
+      <div id="placeholder-logo" class="placeholder-logo" style="display:none;">
+        <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+          <rect x="10" y="10" width="100" height="100" rx="20" fill="url(#gradient1)" />
+          <path d="M30 60 L50 40 L70 80 L90 50" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="60" cy="60" r="8" fill="white" opacity="0.8"/>
+          <defs>
+            <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Name Input Screen (shown after splash) -->
+  <div id="name-input-screen" class="name-input-screen" style="display:none;">
+    <div class="name-input-container">
+      <h1>Welcome!</h1>
+      <p>Enter your name to start collaborating</p>
+      <input type="text" id="name-input-field" placeholder="Your name" maxlength="20" autocomplete="off">
+      <button id="start-btn" class="start-button">Let's Go! 🎨</button>
+    </div>
+  </div>
+  
+  <!-- Interactive Tutorial Overlay -->
+  <div id="tutorial-overlay" class="tutorial-overlay" style="display:none;">
+    <div class="tutorial-backdrop"></div>
+    
+    <!-- Tutorial Steps -->
+    <div id="tutorial-step-1" class="tutorial-step" style="display:none;">
+      <div class="tutorial-pointer" style="top: 100px; left: calc(50% - 280px);"></div>
+      <div class="tutorial-bubble" style="top: 170px;">
+        <h3>🎨 Drawing Tools</h3>
+        <p>Choose between <strong>Brush</strong> and <strong>Eraser</strong> to draw freely!</p>
+        <button class="tutorial-next">Next</button>
+      </div>
+    </div>
+    
+    <div id="tutorial-step-2" class="tutorial-step" style="display:none;">
+      <div class="tutorial-pointer" style="top: 100px; left: calc(50% - 180px);"></div>
+      <div class="tutorial-bubble" style="top: 170px;">
+        <h3>📐 Shapes</h3>
+        <p>Click to open the menu and select <strong>Line, Rectangle, or Circle</strong>!</p>
+        <button class="tutorial-next">Next</button>
+      </div>
+    </div>
+    
+    <div id="tutorial-step-3" class="tutorial-step" style="display:none;">
+      <div class="tutorial-pointer" style="top: 100px; left: 50%;"></div>
+      <div class="tutorial-bubble" style="top: 170px;">
+        <h3>🎨 Customize</h3>
+        <p>Adjust <strong>brush size</strong> and pick any <strong>color</strong> you like!</p>
+        <button class="tutorial-next">Next</button>
+      </div>
+    </div>
+    
+    <div id="tutorial-step-4" class="tutorial-step" style="display:none;">
+      <div class="tutorial-pointer" style="top: 100px; left: calc(50% + 180px);"></div>
+      <div class="tutorial-bubble" style="top: 170px;">
+        <h3>↩️ History</h3>
+        <p><strong>Undo/Redo</strong> changes for everyone. <strong>Clear All</strong> resets the canvas!</p>
+        <button class="tutorial-next">Next</button>
+      </div>
+    </div>
+    
+    <div id="tutorial-step-5" class="tutorial-step" style="display:none;">
+      <div class="tutorial-pointer" style="top: 100px; left: calc(50% + 300px);"></div>
+      <div class="tutorial-bubble" style="top: 170px;">
+        <h3>👥 Collaborate</h3>
+        <p>See who's online! Everyone draws together in <strong>real-time</strong>! ✨</p>
+        <button class="tutorial-next">Start Drawing!</button>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Site Logo in Top-Left Corner -->
+  <div id="site-logo" class="site-logo">
+    <img src="/logo.png" alt="Logo">
+  </div>
+  
+  <div id="onboarding" style="display:none;position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);color:#fff;z-index:1000;font-family:sans-serif;padding:24px;">
     <div style="background:#222;padding:24px;max-width:480px;width:90%;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.4);">
       <h2 style="margin-top:0">Welcome to Collaborative Canvas</h2>
       <ol style="font-size:14px;line-height:1.4;padding-left:18px;">
@@ -23,39 +114,144 @@
       <p style="margin-top:12px;font-size:11px;opacity:0.75;">Tip: Eraser removes previous pixels; shapes preview until you release.</p>
     </div>
   </div>
-  <!-- Mobile-friendly toolbar: layout adjusts via CSS media queries -->
+  
+  <!-- Paint-Style Toolbar Dock -->
   <div id="toolbar">
-    <button id="toggle-toolbar" aria-label="Toggle toolbar" style="display:none">☰</button>
-    <label class="hide-when-collapsed">🖊️ Brush <input id="size" type="range" min="1" max="32" value="4" /></label>
-    <input id="color" class="hide-when-collapsed" type="color" value="#000000" />
-    <button id="tool-brush" data-tool="brush" class="tool active hide-when-collapsed">🖊️ Brush</button>
-    <button id="tool-eraser" data-tool="eraser" class="tool hide-when-collapsed">🧽 Eraser</button>
-    <button id="tool-line" data-tool="line" class="tool hide-when-collapsed">📏 Line</button>
-    <button id="tool-rect" data-tool="rect" class="tool hide-when-collapsed">▭ Rect</button>
-    <button id="tool-ellipse" data-tool="ellipse" class="tool hide-when-collapsed">⭕ Ellipse</button>
-      <button id="reset-view" class="hide-when-collapsed" title="Reset View">⤾ Reset</button>
-    <button id="undo" title="Undo (Ctrl+Z)" class="hide-when-collapsed">↶ Undo</button>
-    <button id="redo" title="Redo (Ctrl+Y)" class="hide-when-collapsed">↷ Redo</button>
-    <span id="users" class="hide-when-collapsed" title="Online users">0 online</span>
-    <button id="show-users" class="hide-when-collapsed" title="Show all users">👥 Users</button>
-    <button id="clear" class="hide-when-collapsed">Clear (local)</button>
-    <button id="clear-global" class="hide-when-collapsed">Clear (global)</button>
+    <!-- Tools Section -->
+    <div class="toolbar-section">
+      <div class="section-label">Tools</div>
+      <div class="tool-group">
+        <button id="tool-brush" data-tool="brush" class="tool-btn active" title="Brush (B)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.37l-1.34-1.34c-.39-.39-1.02-.39-1.41 0L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.02 0-1.41z"/>
+          </svg>
+        </button>
+        <button id="tool-eraser" data-tool="eraser" class="tool-btn" title="Eraser (E)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M16.24 3.56l4.95 4.94c.78.79.78 2.05 0 2.84L12 20.53a4.008 4.008 0 0 1-5.66 0L2.81 17c-.78-.79-.78-2.05 0-2.84l10.6-10.6c.79-.78 2.05-.78 2.83 0M4.22 15.58l3.54 3.53c.78.79 2.04.79 2.83 0l3.53-3.53-6.36-6.36-3.54 3.53z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Shapes Section with Dropdown -->
+    <div class="toolbar-section">
+      <div class="section-label">Shapes</div>
+      <div class="tool-group">
+        <button id="shapes-toggle" class="tool-btn shapes-btn" title="Shapes">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14z"/>
+          </svg>
+          <span class="dropdown-arrow">▼</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Brush Settings -->
+    <div class="toolbar-section">
+      <div class="section-label">Size</div>
+      <div class="tool-group">
+        <input id="size" type="range" min="1" max="32" value="4" class="size-slider" />
+        <span id="size-display" class="size-value">4px</span>
+      </div>
+    </div>
+
+    <!-- Color Picker -->
+    <div class="toolbar-section">
+      <div class="section-label">Color</div>
+      <div class="tool-group">
+        <input id="color" type="color" value="#000000" class="color-picker" />
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="toolbar-section">
+      <div class="section-label">History</div>
+      <div class="tool-group">
+        <button id="undo" class="tool-btn" title="Undo (Ctrl+Z)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
+          </svg>
+        </button>
+        <button id="redo" class="tool-btn" title="Redo (Ctrl+Y)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/>
+          </svg>
+        </button>
+        <button id="clear-all" class="tool-btn" title="Clear All">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- View -->
+    <div class="toolbar-section">
+      <div class="section-label">View</div>
+      <div class="tool-group">
+        <button id="reset-view" class="tool-btn" title="Reset View">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Users Info -->
+    <div class="toolbar-section">
+      <div class="section-label">Online</div>
+      <div class="tool-group">
+        <button id="show-users" class="tool-btn users-btn" title="Show users">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+          </svg>
+          <span id="users-count" class="user-count">0</span>
+        </button>
+      </div>
+    </div>
   </div>
+
+  <!-- Canvas Stage -->
     <div id="stage">
       <canvas id="base"></canvas>
       <canvas id="live"></canvas>
       <canvas id="hud"></canvas>
     </div>
+    
   <!-- Users Panel -->
-  <div id="users-panel" style="display:none;position:fixed;top:64px;right:16px;z-index:1001;background:#fff;border:1px solid rgba(0,0,0,0.1);box-shadow:0 4px 16px rgba(0,0,0,0.15);border-radius:10px;min-width:240px;max-width:70vw;max-height:60vh;overflow:auto;">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,0.06);">
-      <strong>👥 Users</strong>
-      <button id="users-close" title="Close" style="border:none;background:transparent;font-size:18px;cursor:pointer;">✕</button>
+  <div id="users-panel" style="display:none;">
+    <div class="panel-header">
+      <strong>👥 Online Users</strong>
+      <button id="users-close" title="Close">✕</button>
     </div>
-    <ul id="users-list" style="list-style:none;margin:0;padding:10px 12px;display:flex;flex-direction:column;gap:6px;"></ul>
+    <ul id="users-list"></ul>
   </div>
+  
+  <!-- Shapes Dropdown (outside toolbar to avoid clipping) -->
+  <div id="shapes-menu" class="shapes-dropdown">
+    <button id="tool-line" data-tool="line" class="shape-option" title="Line">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="5" y1="19" x2="19" y2="5"/>
+      </svg>
+      <span>Line</span>
+    </button>
+    <button id="tool-rect" data-tool="rect" class="shape-option" title="Rectangle">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="5" y="7" width="14" height="10" rx="1"/>
+      </svg>
+      <span>Rectangle</span>
+    </button>
+    <button id="tool-ellipse" data-tool="ellipse" class="shape-option" title="Ellipse">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="7"/>
+      </svg>
+      <span>Circle</span>
+    </button>
+  </div>
+  
   <!-- Toasts -->
-  <div id="toasts" style="position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:1002;display:flex;flex-direction:column;gap:8px;align-items:center;"></div>
+  <div id="toasts"></div>
   <script type="module" src="/build/bundle.js"></script>
   </body>
   </html>
