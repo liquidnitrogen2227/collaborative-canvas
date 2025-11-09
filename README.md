@@ -1,67 +1,89 @@
-# Collaborative Canvas (TypeScript + Socket.io)
+# Collaborative Canvas
 
-Real-time multi-user drawing with brush/eraser, colors, stroke width, live cursors, and global undo/redo. Vanilla Canvas on the frontend and Node.js + Socket.io on the backend. No frameworks.
+A real-time multiplayer drawing application built with TypeScript and Socket.io. Draw together with others in real-time, featuring live cursors, multiple tools, and synchronized undo/redo.
 
-## Quick start
+![Demo Screenshot](./docs/images/demo.png)
 
-```powershell
+## Features
+
+- **Drawing Tools**: Brush, eraser, line, rectangle, and ellipse with customizable colors and sizes
+- **Real-time Collaboration**: See others drawing in real-time with live cursors showing their names
+- **Global Undo/Redo**: Synchronized undo/redo that works across all connected users (Ctrl+Z/Ctrl+Y)
+- **Auto-Reconnection**: Automatic reconnection on network failures with session restoration
+- **Mobile-Friendly**: Responsive design with touch support, pinch-to-zoom, and two-finger pan
+- **Infinite Canvas**: Pan and zoom with smooth navigation and world-coordinate system
+- **Performance Stats**: Real-time FPS counter and latency monitoring
+- **Interactive Tutorial**: First-time user guide with step-by-step tool introduction
+- **Session Persistence**: Your username and preferences saved across visits
+
+## Quick Start
+
+```bash
 npm install
 npm start
 ```
 
-Then open two browser windows to http://localhost:3000 and draw.
+Open https://collaborative-canvas-t753.onrender.com/ in multiple browser tabs to try collaborative drawing.
 
-## What's included
+## Project Structure
 
-- server/server.ts – Express + Socket.io server; serves static client and manages protocol
-- server/rooms.ts – simple in-memory room + user registry
-- server/drawing-state.ts – authoritative stroke history with global undo/redo
-- client/index.html – layered canvases (base/live/hud) + toolbar + performance stats
-- client/style.css – responsive styles with mobile optimizations
-- Mobile-friendly responsive toolbar and high-DPI canvas rendering
-- client/renderer.ts – multi-layer canvas renderer (no path bridging)
-- client/websocket.ts – typed Socket.io client with reconnection handling
-- client/main.ts – tool handling, streaming, state replay, cursors, undo/redo, FPS tracking
-- tsconfig.server.json – TypeScript config for server build (CommonJS, dist/)
-- render.yaml – Render.com blueprint (server + client on one origin)
-- package.json – scripts: build, dev, start
+```
+collaborative-canvas/
+├── client/
+│   ├── main.ts          # Event handling, tool logic, UI coordination
+│   ├── renderer.ts      # Three-layer canvas rendering system
+│   ├── websocket.ts     # Socket.io client with reconnection logic
+│   ├── canvas.ts        # Canvas utilities and coordinate transforms
+│   ├── index.html       # UI structure
+│   └── style.css        # Responsive styles with Apple-inspired design
+├── server/
+│   ├── server.ts        # Express + Socket.io server
+│   ├── rooms.ts         # User and room management
+│   └── drawing-state.ts # Authoritative stroke history with undo/redo
+└── package.json
+```
 
-## Features
+## How It Works
 
-### Real-time Collaboration
-- Live stroke streaming (point-by-point)
-- User presence with colored cursors and names
-- Join/leave notifications via toast messages
-- Global undo/redo (affects all users)
-- Multiple drawing tools (brush, eraser, line, rectangle, ellipse)
+### Architecture Overview
 
-### Performance Monitoring
-- **FPS Counter**: Real-time frames-per-second display (top-right corner)
-- **Latency Display**: Shows ping time to server with color coding:
-  - Green: < 50ms (excellent)
-  - Orange: 50-100ms (good)
-  - Red: > 100ms (poor)
-- **Connection Status**: Visual indicator showing connection state:
-  - Green dot: Connected
-  - Red dot (pulsing): Disconnected
-  - Orange dot (pulsing): Reconnecting
+![Architecture Diagram](./docs/images/arch.png)
 
-### Automatic Reconnection
-- Socket.io handles automatic reconnection on network failures
-- User credentials (name/color) preserved across reconnections
-- Automatic room re-join after reconnection
-- Visual feedback during connection state changes
-- Fresh state snapshot requested after reconnection to ensure sync
+The system uses a client-server architecture where the server maintains authoritative state and broadcasts updates to all connected clients.
 
-## Scripts
+### Three-Layer Canvas System
 
-- npm run dev – start TS server (watch) and client bundler (watch)
-- npm run build – compile server and bundle client
-- npm start – build then run server from dist (for local Node server)
+![Canvas Layers]
+The app uses three stacked canvases to prevent visual artifacts during concurrent drawing:
+- **Base Canvas**: Finalized strokes (replayed from server history)
+- **Live Canvas**: In-progress strokes (being drawn right now)
+- **HUD Canvas**: Cursors, overlays, and UI elements
 
-## Testing multi-user
+### Real-time Stroke Streaming
 
-Open two tabs at http://localhost:3000 and draw. You'll see live strokes and cursors across tabs. Use Ctrl+Z / Ctrl+Y or toolbar buttons for global undo/redo.
+![Data Flow Diagram](./docs/images/dfd.png)
+
+Instead of sending complete strokes, the app streams drawing points in real-time:
+1. `stroke:begin` → Announces new stroke (tool, color, size)
+2. `stroke:point` → Streams each point as you draw
+3. `stroke:end` → Finalizes the stroke
+
+This creates a truly collaborative "drawing together" experience.
+
+## Development
+
+```bash
+npm run dev    # Start with auto-reload (recommended for development)
+npm run build  # Compile TypeScript
+npm start      # Build and run production server
+```
+
+## Testing Multi-User
+
+**User Testing:**
+- Open multiple browser tabs at https://collaborative-canvas-t753.onrender.com/
+- Draw in one tab and watch it appear in others
+
 
 ## User Experience
 
@@ -84,54 +106,72 @@ Open two tabs at http://localhost:3000 and draw. You'll see live strokes and cur
 - Page reloads with full onboarding flow
 - Perfect for switching to a different name or starting over
 
-### Manual Reset (Alternative)
-To reset via DevTools Console:
-```javascript
-localStorage.clear()
-// Then reload the page
-```
+## Navigation & Controls
 
-## Notes / Limitations
+**Desktop:**
+- Pan: Hold `Space` and drag, or mouse wheel to scroll
+- Zoom: `Ctrl` + mouse wheel (centered on pointer)
+- Undo/Redo: `Ctrl+Z` / `Ctrl+Y` or toolbar buttons
+- Reset View: Button to return to 100% zoom
 
-- In-memory history only (no persistence). Deploying multiple instances would need shared state (e.g., Redis pub/sub + store).
-- Global undo/redo is LIFO across all users (last operation wins), capped at 5 consecutive undos to keep interactions snappy.
-- Collision/conflict resolution is server-order based. Eraser uses compositing to non-destructively remove pixels from prior ops.
+**Mobile:**
+- Draw: Single finger
+- Pan: Two-finger drag
+- Zoom: Pinch gesture
+- Responsive toolbar collapses on smaller screens
 
-## Infinite canvas & navigation
+**Infinite Canvas:** All strokes stored in world coordinates, render correctly at any zoom level.
 
-- Pan (desktop): hold Space and drag, or use the mouse wheel (no Ctrl) to scroll/pan.
-- Zoom (desktop): Ctrl + mouse wheel; zoom is centered under the pointer. Use the "Reset View" button to return to 100%.
-- Pan/Zoom (mobile): two-finger pan and pinch-zoom. Single finger draws. The view keeps the content under your fingers stable while zooming.
-- All strokes are stored in world coordinates and render correctly at any zoom level.
+## Mobile Features
 
-## Mobile compatibility
+## Mobile Features
 
-This app includes several mobile-focused improvements:
+- High-DPI rendering for crisp graphics on Retina displays
+- Pointer capture prevents dropouts during drawing
+- Two-finger pan and pinch-zoom
+- Responsive toolbar (collapses under 700px width)
+- Orientation changes preserve content
 
-- Responsive toolbar that wraps on small screens and can be collapsed via a toggle button (appears under ~700px width).
-- High-DPI rendering: canvases allocate device pixels and map CSS pixels through a transform for crisp results on Retina devices.
-- Touch drawing refinements: pointer capture to avoid dropouts, `touch-action: none` to prevent scroll/zoom while drawing, and a guarded `touchmove` handler to stop pull-to-refresh during strokes. Two-finger pan and pinch-zoom are supported for the infinite canvas.
-- Orientation changes and resizes preserve content by snapshotting and redrawing after canvas resize.
+## Limitations
 
-Future ideas:
-- Optional Wake Lock to keep the screen on while collaborating.
-  
+- **No Persistence**: In-memory only (server restart = data loss)
+- **Single Server**: Load balancing needs shared state (Redis/database)
+- **Undo Limit**: Max 5 operations for performance
+- **No Room Codes**: Everyone joins the default room
 
-## Deploy to Render (recommended for realtime)
+## Future Ideas
 
-This app is designed to run server and client on the same origin (best for Socket.io).
+- Database persistence
+- Private rooms with codes
+- More tools (fill bucket, text, images)
+- Export to PNG/SVG
+- Stroke smoothing
+- User authentication
+- Wake Lock API
 
-1) Fork/clone this repo.
-2) Create a new Web Service on Render and connect your repo.
-	- Build Command: `npm run build`
-	- Start Command: `node dist/server/server.js`
-	- Health Check Path: `/healthz`
-3) Deploy. Render sets `PORT` automatically; the server will pick it up.
-4) Open your Render URL in two browser tabs and draw—strokes should sync in real time.
+## Deploy to Render
 
-Optional: You can also use `render.yaml` in this repo to spin up the service via “Blueprints” on Render.
-- Security hardening (CSP, rate limiting) is pared down for simplicity; add per your deployment needs.
+1. Fork this repository
+2. Create a Web Service on Render
+   - Build: `npm run build`
+   - Start: `node dist/server/server.js`
+   - Health Check: `/healthz`
+3. Deploy (auto-detects `render.yaml`)
 
-## Time spent
+Free tier spins down after inactivity (~30s wake time).
 
-Initial scaffold → realtime → dual-canvas fix → tools/undo/redo/cursors/internals: ~4–6 hours.
+## License
+
+MIT - use however you'd like!
+
+## Contributing
+
+Issues and PRs welcome!
+
+---
+
+Built with vanilla TypeScript and Socket.io
+
+---
+
+Built with vanilla TypeScript + Socket.io 🎨

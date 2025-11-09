@@ -510,7 +510,7 @@ leaveSessionBtn?.addEventListener('click', () => {
   if (confirm('Leave this session? Your name and progress will be forgotten.')) {
     console.log('[Leave Session] Clearing localStorage and reloading...');
     localStorage.clear();
-    toast('👋 Leaving session...', 1500);
+    toast('Leaving Canvas', 1500);
     setTimeout(() => {
       window.location.reload();
     }, 1500);
