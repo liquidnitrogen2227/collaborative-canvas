@@ -53,7 +53,7 @@ The system uses a client-server architecture where the server maintains authorit
 
 ### Three-Layer Canvas System
 
-![Canvas Layers]
+Canvas Layers
 The app uses three stacked canvases to prevent visual artifacts during concurrent drawing:
 - **Base Canvas**: Finalized strokes (replayed from server history)
 - **Live Canvas**: In-progress strokes (being drawn right now)
@@ -154,6 +154,3 @@ npm start      # Build and run production server
 
 Built with vanilla TypeScript and Socket.io
 
----
-
-Built with vanilla TypeScript + Socket.io
